@@ -1,0 +1,46 @@
+{
+  "baseCurrency": "USD",
+  "holdings": [
+    {
+      "ticker": "JNJ",
+      "shares": 40,
+      "avgCost": 168.9
+    },
+    {
+      "ticker": "AAPL",
+      "shares": 25,
+      "avgCost": 175.2
+    },
+    {
+      "ticker": "MSFT",
+      "shares": 18,
+      "avgCost": 312.55
+    },
+    {
+      "ticker": "GOOGL",
+      "shares": 30,
+      "avgCost": 138.4
+    },
+    {
+      "ticker": "NVDA",
+      "shares": 12,
+      "avgCost": 88.75
+    },
+    {
+      "ticker": "V",
+      "shares": 20,
+      "avgCost": 245.1
+    },
+    {
+      "ticker": "UNH",
+      "shares": 8,
+      "avgCost": 475
+    },
+    {
+      "ticker": "AMD",
+      "shares": 32,
+      "avgCost": 260.8
+    }
+  ],
+  "watchlist": []
+}

@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    background: #0a0a0f;
+    color: #e8e8ee;
+    font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 15% -10%, rgba(124, 92, 255, 0.10), transparent 45%),
+      radial-gradient(circle at 90% 110%, rgba(34, 211, 238, 0.06), transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(124, 92, 255, 0.35);
+  }
+
+  /* Tabular numerals for finance */
+  .tnum,
+  table,
+  td,
+  th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Sleek scrollbar */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #2a2a3a;
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: #3a3a4d;
+  }
+
+  input,
+  button,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-bg-card shadow-card;
+  }
+  .card-elev {
+    @apply rounded-2xl border border-line bg-bg-elev;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .label-eyebrow {
+    @apply text-[10px] font-medium uppercase tracking-[0.14em] text-ink-fade;
+  }
+}
