@@ -24,6 +24,18 @@ const KV_URL = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL
 const KV_TOKEN =
   process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
 const USE_REDIS = Boolean(KV_URL && KV_TOKEN);
+// Detect running on Vercel / similar serverless host where the filesystem
+// is read-only. Vercel always sets the VERCEL env var.
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME
+);
+
+class PortfolioStoreConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PortfolioStoreConfigError";
+  }
+}
 
 const FILE = path.join(process.cwd(), "data", "portfolio.json");
 const KV_KEY = "portfolio:state:v1";
@@ -58,6 +70,15 @@ async function loadFromFile(): Promise<PortfolioFile> {
 }
 
 async function saveToFile(p: PortfolioFile): Promise<void> {
+  if (IS_SERVERLESS) {
+    throw new PortfolioStoreConfigError(
+      "Cannot persist data: running on a read-only serverless filesystem " +
+        "but no Redis backend is configured. Provision Upstash Redis on " +
+        "Vercel (Storage → Create Database → Upstash → Redis), connect it " +
+        "to this project so KV_REST_API_URL and KV_REST_API_TOKEN are " +
+        "injected, then trigger a redeploy. See VERCEL_DEPLOY.md for details."
+    );
+  }
   await fs.writeFile(FILE, JSON.stringify(p, null, 2), "utf8");
 }
 
