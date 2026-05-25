@@ -1,50 +1,47 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
-.venv/
-venv/
-env/
-.env
-.env.local
-
-# Jupyter
-.ipynb_checkpoints/
-
 # Node / Next.js
 node_modules/
 .next/
 out/
-*.tsbuildinfo
-next-env.d.ts
-
-# Build / cache
-.cache/
-.parcel-cache/
-
-# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# OS
+# Env
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Editor / OS
 .DS_Store
 Thumbs.db
-desktop.ini
-
-# IDE / editor
-.vscode/
-.idea/
 *.swp
 *.swo
+.idea/
+.vscode/
 
-# Excel/Office temp files
-~$*.xlsx
-~$*.xls
-~$*.docx
+# Cursor agent state (keep .cursor/rules if any, but exclude transient stuff)
+.cursor/agent-cache/
+
+# Local-only data
+*.local.json
+
+# Build artefacts
+dist/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
