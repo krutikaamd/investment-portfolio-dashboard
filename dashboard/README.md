@@ -93,6 +93,15 @@ Click the **Holdings** button in the header, or edit `data/portfolio.json`:
 
 Tickers must be Yahoo Finance symbols (e.g. `BRK-B`, not `BRK.B`).
 
+## Pages
+
+| Route                  | What it shows                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                    | Portfolio dashboard: holdings, watchlist, allocation engine, top news. Clicking a row opens a quick inline DCF preview.                                                              |
+| `/stock/[ticker]`      | **Full DCF deep-dive page.** Hero KPIs, model decision drivers, WACC build, three-scenario summary, full year-by-year UFCF table (Bull/Base/Bear toggle), EV→equity bridge, sensitivity heatmap, historical financials, and per-ticker news. |
+
+Both tables (holdings + watchlist) link the ticker symbol straight to the per-stock page; the rest of the row still opens the inline preview.
+
 ## API endpoints
 
 | Endpoint                              | Returns                                              |
@@ -101,6 +110,9 @@ Tickers must be Yahoo Finance symbols (e.g. `BRK-B`, not `BRK.B`).
 | `PUT /api/portfolio`                  | Replace holdings list                                |
 | `GET /api/valuation?ticker=JNJ`       | Full per-stock DCF + WACC + sensitivity grid         |
 | `GET /api/allocate?cash=5000`         | Portfolio valuation + recommendations for $5k input  |
+| `GET /api/watchlist`                  | Watchlist valuations                                 |
+| `GET /api/news?topN=10`               | Top-N ranked portfolio headlines                     |
+| `GET /api/news?ticker=AAPL&topN=8`    | Headlines for a single ticker (used by `/stock/[t]`) |
 
 Yahoo data is cached server-side for 15 minutes per ticker.
 
@@ -112,15 +124,21 @@ dashboard/
 │   ├── page.tsx                 ← main dashboard
 │   ├── layout.tsx
 │   ├── globals.css
+│   ├── stock/[ticker]/page.tsx  ← full DCF deep-dive page
 │   └── api/
 │       ├── portfolio/route.ts   ← GET/PUT portfolio JSON
 │       ├── valuation/route.ts   ← per-stock DCF endpoint
+│       ├── watchlist/route.ts   ← watchlist CRUD + live DCF
+│       ├── news/route.ts        ← portfolio + single-ticker news
 │       └── allocate/route.ts    ← portfolio + allocation endpoint
 ├── components/
 │   ├── PortfolioSummary.tsx     ← top KPI strip
 │   ├── HoldingsTable.tsx        ← live holdings grid
 │   ├── AllocationPanel.tsx      ← "how much to invest today" panel
-│   ├── StockDetail.tsx          ← per-stock DCF breakdown
+│   ├── StockDetail.tsx          ← inline DCF preview panel
+│   ├── DcfSections.tsx          ← shared WACC / scenario / sensitivity blocks
+│   ├── WatchlistTable.tsx       ← non-holding watchlist with live DCF
+│   ├── NewsFeed.tsx             ← portfolio-wide top headlines
 │   ├── PortfolioEditor.tsx      ← add/remove holdings modal
 │   ├── Stat.tsx, VerdictBadge.tsx
 ├── lib/

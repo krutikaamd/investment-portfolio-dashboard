@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Eye, Plus, RefreshCw, X } from "lucide-react";
+import Link from "next/link";
+import { Eye, ExternalLink, Plus, RefreshCw, X } from "lucide-react";
 import { cn, fmtPct, fmtSignedPct, fmtUSD, tone } from "@/lib/utils";
 import { VerdictBadge } from "./VerdictBadge";
 import type { DcfResult } from "@/lib/dcf";
@@ -172,6 +173,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                 <th className="px-3 py-3 font-medium text-right">P/E</th>
                 <th className="px-3 py-3 font-medium text-right">Div Y</th>
                 <th className="px-5 py-3 font-medium">Verdict</th>
+                <th className="px-3 py-3 font-medium text-right">Model</th>
                 <th className="px-3 py-3 font-medium"></th>
               </tr>
             </thead>
@@ -187,7 +189,15 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                   >
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold">{w.ticker}</span>
+                        <Link
+                          href={`/stock/${encodeURIComponent(w.ticker)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1 font-semibold text-accent-glow hover:underline w-fit"
+                          title={`Open full DCF model for ${w.ticker}`}
+                        >
+                          {w.ticker}
+                          <ExternalLink className="h-3 w-3 opacity-70" />
+                        </Link>
                         <span className="text-[11px] text-ink-fade truncate max-w-[160px]">
                           {w.dcf.snapshot.longName}
                         </span>
@@ -261,6 +271,17 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                     </td>
                     <td className="px-5 py-3.5">
                       <VerdictBadge verdict={w.dcf.verdict} />
+                    </td>
+                    <td className="px-3 py-3.5 text-right">
+                      <Link
+                        href={`/stock/${encodeURIComponent(w.ticker)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-glow hover:bg-accent/20 transition"
+                        title={`Open full DCF model for ${w.ticker}`}
+                      >
+                        Open
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
                     </td>
                     <td className="px-3 py-3.5">
                       <button

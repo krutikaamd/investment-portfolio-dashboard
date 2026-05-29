@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { cn, fmtNum, fmtPct, fmtSignedPct, fmtUSD, tone } from "@/lib/utils";
 import type { ValuedHolding } from "@/lib/allocate";
 import { VerdictBadge } from "./VerdictBadge";
@@ -38,6 +40,7 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
               <th className="px-3 py-3 font-medium text-right">WACC</th>
               <th className="px-3 py-3 font-medium text-right">Weight</th>
               <th className="px-5 py-3 font-medium">Verdict</th>
+              <th className="px-3 py-3 font-medium text-right">Model</th>
             </tr>
           </thead>
           <tbody>
@@ -56,7 +59,15 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                 >
                   <td className="px-5 py-3.5">
                     <div className="flex flex-col gap-0.5">
-                      <span className="font-semibold">{h.dcf.ticker}</span>
+                      <Link
+                        href={`/stock/${encodeURIComponent(h.dcf.ticker)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 font-semibold text-accent-glow hover:underline w-fit"
+                        title={`Open full DCF model for ${h.dcf.ticker}`}
+                      >
+                        {h.dcf.ticker}
+                        <ExternalLink className="h-3 w-3 opacity-70" />
+                      </Link>
                       <span className="text-[11px] text-ink-fade truncate max-w-[160px]">
                         {h.dcf.snapshot.longName}
                       </span>
@@ -157,6 +168,17 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                   </td>
                   <td className="px-5 py-3.5">
                     <VerdictBadge verdict={h.dcf.verdict} />
+                  </td>
+                  <td className="px-3 py-3.5 text-right">
+                    <Link
+                      href={`/stock/${encodeURIComponent(h.dcf.ticker)}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent-glow hover:bg-accent/20 transition"
+                      title={`Open full DCF model for ${h.dcf.ticker}`}
+                    >
+                      Open
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </td>
                 </tr>
               );

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
-import { getPortfolioNews } from "@/lib/yahoo";
+import { getCompanyNews, getPortfolioNews } from "@/lib/yahoo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
+  const ticker = searchParams.get("ticker");
   const perTicker = Math.min(
     Math.max(Number(searchParams.get("perTicker") ?? 8), 1),
     15
@@ -14,6 +15,18 @@ export async function GET(req: Request) {
   const topN = Math.min(Math.max(Number(searchParams.get("topN") ?? 10), 1), 50);
 
   try {
+    if (ticker) {
+      // Single-ticker mode — used by the per-stock deep-dive page.
+      const items = await getCompanyNews(ticker.toUpperCase(), topN);
+      return NextResponse.json(
+        {
+          asOf: new Date().toISOString(),
+          tickers: [ticker.toUpperCase()],
+          items,
+        },
+        { headers: { "Cache-Control": "no-store, max-age=0" } }
+      );
+    }
     const portfolio = await loadPortfolio();
     const tickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
     const news = await getPortfolioNews(tickers, perTicker, topN);

@@ -63,12 +63,26 @@ export default function Page() {
         loading={loading}
       />
 
-      <main className="max-w-[1440px] mx-auto px-6 pb-20 space-y-8">
+      <main className="max-w-[1440px] mx-auto px-6 pt-6 pb-20 space-y-8">
         {error && (
           <div className="rounded-xl border border-neg/40 bg-neg/10 p-4 text-sm text-neg">
             {error}
           </div>
         )}
+
+        <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[12px] text-ink-dim flex items-center justify-between gap-3 flex-wrap">
+          <span>
+            <span className="font-semibold text-accent-glow">New:</span> Click
+            any{" "}
+            <span className="font-mono text-accent-glow">
+              Open ↗
+            </span>{" "}
+            button (or the coloured ticker symbol) in the tables below to view
+            the <strong className="text-ink">full DCF model</strong> for that
+            stock — year-by-year UFCF projections, EV→equity bridge, historical
+            financials, sensitivity grid, and per-ticker news.
+          </span>
+        </div>
 
         {data && <ConsensusAlertBanner data={data} onJump={setSelectedTicker} />}
 
