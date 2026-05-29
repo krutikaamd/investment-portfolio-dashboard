@@ -70,6 +70,7 @@ export interface FinancialsRow {
 export interface BalanceSheetRow {
   endDate: string;
   cashAndShortTermInvestments: number | null;
+  longTermInvestments: number | null;     // Marketable securities (AAPL ~$130B, etc.)
   totalDebt: number | null;
   totalStockholderEquity: number | null;
   accountsReceivable: number | null;
@@ -83,6 +84,8 @@ export interface CashFlowRow {
   capex: number | null;
   depreciationAmortization: number | null;
   freeCashFlow: number | null;            // Yahoo reported (levered)
+  stockRepurchases: number | null;        // Cash spent buying back shares (positive number)
+  dividendsPaid: number | null;           // Cash returned via dividends (positive number)
 }
 
 export interface AnalystGrowth {
@@ -246,6 +249,10 @@ export async function getCompanyData(ticker: string): Promise<CompanyData> {
       cashAndShortTermInvestments:
         num(r.cashCashEquivalentsAndShortTermInvestments) ??
         num(r.cashAndCashEquivalents),
+      longTermInvestments:
+        num(r.longTermInvestments) ??
+        num(r.investmentsAndAdvances) ??
+        num(r.availableForSaleSecurities),
       totalDebt: num(r.totalDebt),
       totalStockholderEquity:
         num(r.stockholdersEquity) ?? num(r.commonStockEquity),
@@ -267,12 +274,23 @@ export async function getCompanyData(ticker: string): Promise<CompanyData> {
       const fcf =
         num(r.freeCashFlow) ??
         (ocf !== null && capex !== null ? ocf + capex : null);
+      // Yahoo reports buybacks as a *negative* number (cash outflow). We want
+      // the magnitude (positive) for buyback-yield math downstream.
+      const buybacksRaw =
+        num(r.repurchaseOfCapitalStock) ?? num(r.commonStockRepurchased);
+      const stockRepurchases =
+        buybacksRaw !== null ? Math.abs(buybacksRaw) : null;
+      const divsRaw =
+        num(r.cashDividendsPaid) ?? num(r.commonStockDividendPaid);
+      const dividendsPaid = divsRaw !== null ? Math.abs(divsRaw) : null;
       return {
         endDate: isoDate((r as { date?: unknown }).date),
         operatingCashFlow: ocf,
         capex,
         depreciationAmortization: da,
         freeCashFlow: fcf,
+        stockRepurchases,
+        dividendsPaid,
       };
     })
     .filter((r) => r.freeCashFlow !== null);

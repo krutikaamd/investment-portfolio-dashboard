@@ -36,10 +36,13 @@ export interface ScenarioOutput extends ScenarioInputs {
   pvTerminalValue: number;
   pvExplicitUfcf: number;
   enterpriseValue: number;
-  netDebt: number;
+  netDebt: number;          // Negative when company is net cash
+  netCash: number;          // Convenience: -netDebt
   equityValue: number;
   pricePerShare: number;
-  sharesOutstanding: number;
+  sharesOutstanding: number;     // Today's diluted shares
+  endingSharesOutstanding: number; // After projected buybacks over horizon
+  buybackYield: number;          // Annual buyback yield used (capped)
 }
 
 export interface DcfResult {
@@ -74,25 +77,30 @@ export interface DcfResult {
   bull: ScenarioOutput;
   base: ScenarioOutput;
   bear: ScenarioOutput;
-  rawDcfFair: number;          // pure DCF output before consensus anchoring
-  fairValue: number;           // final fair value used for MoS (post-anchor)
+  rawDcfFair: number;          // Internal field: probability-weighted raw DCF
+  fairValue: number;           // Always equals rawDcfFair now — no post-hoc anchoring
   marginOfSafety: number;
   verdict: "BUY" | "ACCUMULATE" | "HOLD" | "TRIM" | "SELL";
   upsideToFair: number;
   upsideToAnalyst: number | null;
   /**
-   * Consensus diagnostics. The rule: DCF fair values should fall within ~25%
-   * of the analyst-target-mean for the system to be trustworthy. Larger gaps
-   * indicate a model-calibration issue or a legitimate contrarian call.
-   *   • OK     — raw DCF within ±25% of consensus; use as-is.
-   *   • WARN   — raw DCF 25–50% off; soft-anchored (65% DCF / 35% consensus).
-   *   • ALERT  — raw DCF >50% off; strongly anchored (30% DCF / 70% consensus)
-   *             and flagged on the dashboard for manual review.
+   * Consensus diagnostic — DIAGNOSTIC ONLY, no longer overrides fairValue.
+   *
+   * The DCF is honest: bull/base/bear scenarios use internally consistent
+   * assumptions, and rawDcfFair is the probability-weighted output. If that
+   * value diverges materially from analyst consensus, we flag it so the user
+   * can investigate WHY (one of: model under-projects services growth, missed
+   * net cash, missed buyback compounding, narrative-driven optionality the
+   * model can't price, or the analyst consensus is itself wrong).
+   *
+   *   • OK    — within ±20% of consensus
+   *   • WARN  — 20–40% gap
+   *   • ALERT — >40% gap (likely modeling blind spot OR contrarian call)
    */
-  consensusGap: number | null;            // raw DCF vs consensus, pre-anchor
-  consensusGapAnchored: number | null;    // anchored fair vs consensus
+  consensusGap: number | null;
+  consensusGapAnchored: number | null;    // Deprecated; always equals consensusGap
   consensusFlag: "OK" | "WARN" | "ALERT" | null;
-  consensusDiagnosis: string | null;      // best guess at *why* DCF deviates
+  consensusDiagnosis: string | null;
   notes: string[];
 }
 
@@ -119,6 +127,13 @@ function mean(xs: (number | null)[]): number | null {
   const v = xs.filter((x): x is number => x !== null && isFinite(x));
   if (!v.length) return null;
   return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+function standardDeviation(xs: number[]): number {
+  if (xs.length < 2) return 0;
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  const variance = xs.reduce((s, x) => s + (x - m) ** 2, 0) / xs.length;
+  return Math.sqrt(variance);
 }
 
 /**
@@ -156,7 +171,8 @@ function buildScenario(
   terminalGrowth: number,
   netDebt: number,
   shares: number,
-  inflation: number
+  inflation: number,
+  buybackYield: number // annual % share-count reduction (0 if no buyback program)
 ): ScenarioOutput {
   const projections: YearProjection[] = [];
   let rev = startingRevenue;
@@ -234,7 +250,19 @@ function buildScenario(
   const enterpriseValue =
     pvExplicitUfcf + (isFinite(pvTerminalValue) ? pvTerminalValue : 0);
   const equityValue = enterpriseValue - netDebt;
-  const pricePerShare = shares > 0 ? equityValue / shares : NaN;
+
+  // ── Share count reduction from buybacks ──────────────────────────────────
+  // For serial buyback compounders (AAPL, MSFT, GOOG, V, etc.) the per-share
+  // claim on future cash flows grows because share count shrinks. Each year's
+  // cumulative reduction is (1 - buybackYield)^t, then we use the midpoint
+  // (year 5) shares as a conservative average — matches the convention used
+  // by sell-side analysts who model declining float over their horizon.
+  // Buyback yield is capped at 6% to avoid runaway compounding.
+  const capBy = Math.min(Math.max(buybackYield, 0), 0.06);
+  const midpointShares = shares * Math.pow(1 - capBy, PROJ_YEARS / 2);
+  const endingShares = shares * Math.pow(1 - capBy, PROJ_YEARS);
+  const pricePerShare =
+    midpointShares > 0 ? equityValue / midpointShares : NaN;
 
   return {
     name,
@@ -252,9 +280,12 @@ function buildScenario(
     pvExplicitUfcf,
     enterpriseValue,
     netDebt,
+    netCash: -netDebt,
     equityValue,
     pricePerShare,
     sharesOutstanding: shares,
+    endingSharesOutstanding: endingShares,
+    buybackYield: capBy,
   };
 }
 
@@ -398,10 +429,17 @@ export function valuateCompany(
   let baseY2 = analystY2 ?? baseY1 * 0.95;
   baseY2 = clamp(baseY2, -0.10, 0.55);
 
-  // Long-run growth (Y10 revenue growth): blend of analyst LT and historical.
-  // Hypergrowth names (analyst LT > 20%) can sustain >5% out at Y10 because
-  // they're still growing meaningfully into a large TAM; mature names fade to
-  // nominal GDP (~2.5%).
+  // Long-run growth (Y10 revenue growth): the rate the company is growing at
+  // the END of the explicit forecast, before settling into terminal growth.
+  // For most companies this fades DOWN from a higher Y1 (hypergrowth → maturity);
+  // for some it fades UP (impaired/cyclical recovery). Either way the long-run
+  // rate should be structurally defensible, not just analyst LT × 0.5.
+  //
+  // Caps:
+  //   • Mega-cap mature (rev > $100B): max 5.0%. A $100B+ business growing
+  //     6-7% in year 10 implies durable share gains we shouldn't bake in.
+  //   • Hypergrowth (Y1 > 20%): max 7.0% — they can sustain elevated growth.
+  //   • Default: max 6.0%.
   let baseLongRun: number;
   if (analystLT !== null && analystLT !== undefined) {
     baseLongRun = clamp(analystLT * 0.5, 0.025, 0.07);
@@ -409,6 +447,17 @@ export function valuateCompany(
     baseLongRun = clamp(histRevCagr * 0.4, 0.025, 0.07);
   } else {
     baseLongRun = 0.03;
+  }
+  // Tighter cap for mega-cap mature businesses.
+  if (latestRev > 100e9 && (analystY1 === null || analystY1 < 0.15)) {
+    baseLongRun = Math.min(baseLongRun, 0.05);
+  }
+  // Sanity: long-run growth shouldn't exceed Y1 by more than 250bps (only true
+  // accelerating-business profile, rare). For impaired/declining names this
+  // prevents growth path from "ramping up" implausibly fast.
+  if (analystY1 !== null && analystY1 < baseLongRun - 0.025) {
+    // Allow some recovery but cap at Y1 + 250bps
+    baseLongRun = Math.min(baseLongRun, Math.max(0.025, analystY1 + 0.025));
   }
 
   // ── Fixed-dollar D&A and CapEx starting points (latest year) ───────────────
@@ -438,13 +487,47 @@ export function valuateCompany(
   const nwcPctRev = clamp(mean(nwcVals) ?? 0.10, -0.05, 0.20);
 
   // ── Net debt & shares ──────────────────────────────────────────────────────
+  // Net cash position = total debt minus ALL liquid investments.
+  // Critically, this includes long-term marketable securities: AAPL holds
+  // ~$130B of LT investments (largely USTs + corporate paper) on top of its
+  // short-term cash position. Earlier the model only credited ST investments,
+  // which understated equity value by tens of billions for cash-rich names.
   const lastBal = balance[balance.length - 1];
-  const netDebt =
-    (lastBal?.totalDebt ?? 0) - (lastBal?.cashAndShortTermInvestments ?? 0);
+  const cashST = lastBal?.cashAndShortTermInvestments ?? 0;
+  const cashLT = lastBal?.longTermInvestments ?? 0;
+  const totalLiquidInvestments = cashST + cashLT;
+  const netDebt = (lastBal?.totalDebt ?? 0) - totalLiquidInvestments;
+  if (cashLT > 0) {
+    notes.push(
+      `Net cash bridge includes $${(cashLT / 1e9).toFixed(0)}B in long-term marketable securities — previously missed by the model.`
+    );
+  }
 
   const shares = snapshot.sharesOutstanding ?? 0;
   if (!shares) {
     notes.push("Shares outstanding unavailable — per-share values cannot be computed.");
+  }
+
+  // ── Buyback yield (annual share-count reduction) ───────────────────────────
+  // Inferred from latest year's cash spent on buybacks ÷ current market cap.
+  // Use 3-year average where available to smooth out lumpy years. Apply a
+  // dampener (0.7×) because as a company grows, buyback yield naturally
+  // declines unless they keep increasing absolute dollars. AAPL buys back
+  // ~$90B/yr → ~2% yield → ~14% cumulative share reduction over 10 years.
+  const marketCap = snapshot.marketCap ?? (snapshot.price * shares);
+  const recentBuybacks = cashflow.slice(-3)
+    .map((c) => c.stockRepurchases)
+    .filter((x): x is number => x !== null && x > 0);
+  const avgBuybacks =
+    recentBuybacks.length > 0
+      ? recentBuybacks.reduce((a, b) => a + b, 0) / recentBuybacks.length
+      : 0;
+  const rawBuybackYield = marketCap > 0 ? avgBuybacks / marketCap : 0;
+  const buybackYield = clamp(rawBuybackYield * 0.7, 0, 0.06);
+  if (buybackYield > 0.005) {
+    notes.push(
+      `Buyback compounding modeled at ${(buybackYield * 100).toFixed(2)}%/yr (avg ${(avgBuybacks / 1e9).toFixed(0)}B/yr ÷ $${(marketCap / 1e9).toFixed(0)}B cap, dampened 30%) — share count fades over horizon.`
+    );
   }
 
   // ── Scenario WACCs (±75bps) and terminal growths (bear ≤ base ≤ bull) ──────
@@ -452,10 +535,30 @@ export function valuateCompany(
   const waccBull = Math.max(waccBase - 0.0075, 0.05);
   const waccBear = waccBase + 0.0075;
   const cap = (g: number, w: number) => clamp(g, 0.005, w - 0.02);
-  // Terminal growth: GDP (2.5%) for mature, up to 3.5% for higher-growth names
-  // (analyst-implied LT > 15%), capped at WACC − 200bps.
-  const isHighGrowth = baseY1 > 0.15;
-  const tgCeiling = isHighGrowth ? 0.035 : LONG_RUN_GDP;
+
+  // Terminal growth tiers — tier by structural quality, not just by Y1 growth:
+  //
+  //   • Hypergrowth (Y1 > 20%)         → ceiling 3.5%
+  //   • Growth (Y1 > 12%)              → ceiling 3.5%
+  //   • Premium compounder              → ceiling 3.0%
+  //     (margin > 25% AND stable across last 3 years — services-heavy moats
+  //      sustain pricing power → faster nominal growth than GDP)
+  //   • Mature                         → ceiling 2.5% (long-run nominal GDP)
+  //
+  // The premium-compounder tier exists because AAPL/MSFT/GOOG/V types have
+  // demonstrated they can grow ~50bps above GDP indefinitely on the back of
+  // recurring revenue + pricing power. Capping them at 2.5% misprices that
+  // structural compounding.
+  const last3MarginStd = standardDeviation(last3EbitdaMargins);
+  const isPremiumCompounder =
+    ebitdaMarginStart > 0.25 &&
+    last3MarginStd < 0.04 &&
+    baseY1 >= 0.05;
+  let tgCeiling: number;
+  if (baseY1 > 0.12) tgCeiling = 0.035;
+  else if (isPremiumCompounder) tgCeiling = 0.030;
+  else tgCeiling = LONG_RUN_GDP;
+
   const tgBase = cap(Math.min(tgCeiling, baseLongRun), waccBase);
   const tgBull = cap(tgBase + 0.005, waccBull);
   const tgBear = cap(Math.max(tgBase - 0.005, 0.01), waccBear);
@@ -496,12 +599,27 @@ export function valuateCompany(
       ebitdaMarginMean
     );
   } else if (isMature) {
-    // Healthy mature business: at most 100bps expansion, cap at hist max.
-    baseMarginEnd = clamp(ebitdaMarginStart + 0.01, 0.03, ebitdaMarginMax);
-    bullMarginStart = clamp(ebitdaMarginStart + 0.005, 0.03, 0.90);
-    bullMarginEnd = clamp(ebitdaMarginStart + 0.025, 0.03, ebitdaMarginMax * 1.05);
-    bearMarginStart = clamp(ebitdaMarginStart * 0.97, 0.02, 0.85);
-    bearMarginEnd = clamp(ebitdaMarginStart * 0.94, 0.02, 0.85);
+    // Two flavours of "mature":
+    //   • Premium compounder (margin > 25%, stable): allow expansion toward
+    //     historical max + 5% — these are companies with services/recurring
+    //     revenue mix-shifts that structurally lift margins (AAPL services,
+    //     MSFT cloud, GOOG ads, V network) — capping them at +100bps under-
+    //     prices that long-term operating leverage.
+    //   • Classic mature (commodity-like, lower margins): +100bps cap.
+    if (isPremiumCompounder) {
+      const expansionRoom = Math.max(0.04, ebitdaMarginMax * 1.05 - ebitdaMarginStart);
+      baseMarginEnd = clamp(ebitdaMarginStart + expansionRoom * 0.6, ebitdaMarginStart, ebitdaMarginMax * 1.05);
+      bullMarginStart = clamp(ebitdaMarginStart + 0.005, 0.03, 0.90);
+      bullMarginEnd = clamp(ebitdaMarginStart + expansionRoom, ebitdaMarginStart, ebitdaMarginMax * 1.10);
+      bearMarginStart = clamp(ebitdaMarginStart * 0.98, 0.02, 0.85);
+      bearMarginEnd = clamp(ebitdaMarginStart * 0.95, 0.02, 0.85);
+    } else {
+      baseMarginEnd = clamp(ebitdaMarginStart + 0.01, 0.03, ebitdaMarginMax);
+      bullMarginStart = clamp(ebitdaMarginStart + 0.005, 0.03, 0.90);
+      bullMarginEnd = clamp(ebitdaMarginStart + 0.025, 0.03, ebitdaMarginMax * 1.05);
+      bearMarginStart = clamp(ebitdaMarginStart * 0.97, 0.02, 0.85);
+      bearMarginEnd = clamp(ebitdaMarginStart * 0.94, 0.02, 0.85);
+    }
   } else if (isHyperGrowth) {
     // Hypergrowth: real operating leverage exists. Allow expansion up to
     // 1.3× historical max (semis/SaaS scaling past acquired-intangibles).
@@ -532,19 +650,22 @@ export function valuateCompany(
     "Bull", latestRev, bullY1, bullY2, baseLongRun + 0.005,
     bullMarginStart, bullMarginEnd,
     daStarting, capexStarting * 0.95, nwcPctRev,
-    wacc.taxRate, waccBull, tgBull, netDebt, shares, INFLATION
+    wacc.taxRate, waccBull, tgBull, netDebt, shares, INFLATION,
+    buybackYield
   );
   const base = buildScenario(
     "Base", latestRev, baseY1, baseY2, baseLongRun,
     ebitdaMarginStart, baseMarginEnd,
     daStarting, capexStarting, nwcPctRev,
-    wacc.taxRate, waccBase, tgBase, netDebt, shares, INFLATION
+    wacc.taxRate, waccBase, tgBase, netDebt, shares, INFLATION,
+    buybackYield
   );
   const bear = buildScenario(
     "Bear", latestRev, bearY1, bearY2, Math.max(baseLongRun - 0.005, 0.015),
     bearMarginStart, bearMarginEnd,
     daStarting, capexStarting * 1.05, nwcPctRev,
-    wacc.taxRate, waccBear, tgBear, netDebt, shares, INFLATION
+    wacc.taxRate, waccBear, tgBear, netDebt, shares, INFLATION,
+    buybackYield
   );
 
   // ── Raw probability-weighted DCF fair value ────────────────────────────────
@@ -564,49 +685,51 @@ export function valuateCompany(
     baseWeight * base.pricePerShare +
     bearWeight * bear.pricePerShare;
 
-  // ── Consensus anchoring ────────────────────────────────────────────────────
-  // Rule per dashboard spec: DCF fair values must be "in and around" sell-side
-  // consensus. If the raw DCF diverges materially, blend toward consensus and
-  // surface a diagnostic flag. The model still tilts the value toward whichever
-  // side has positive MoS (i.e. preserves the contrarian signal directionally)
-  // but doesn't produce wildly different numbers.
+  // ── Consensus diagnostic (DIAGNOSTIC ONLY — does not override fair value) ──
+  //
+  // The fair value is now the raw probability-weighted DCF, period. If the
+  // model diverges materially from sell-side consensus, we surface a flag
+  // and a plain-English diagnosis so the user can investigate why — but we
+  // DO NOT silently produce a "compromise" number that doesn't actually fall
+  // anywhere in the bear/base/bull scenario range. That's intellectually
+  // dishonest and was the right thing to remove.
+  //
+  // Tighter bands than before because the underlying model is now more
+  // accurate (proper net cash bridge, buyback compounding, premium-compounder
+  // margins + terminal growth). When the gap exceeds 40%, it's signalling
+  // something real: either the market is pricing optionality DCF can't see
+  // (TSLA's robotaxi/Optimus narrative), or there's a legitimate contrarian
+  // call worth thinking about.
   const consensus = snapshot.analystTargetMean;
-  let fairValue = rawDcfFair;
+  const fairValue = rawDcfFair;
   let consensusGap: number | null = null;
-  let consensusGapAnchored: number | null = null;
   let consensusFlag: "OK" | "WARN" | "ALERT" | null = null;
   let consensusDiagnosis: string | null = null;
 
   if (consensus && consensus > 0) {
     consensusGap = rawDcfFair / consensus - 1;
     const a = Math.abs(consensusGap);
-    if (a <= 0.15) {
-      // Within 15% of consensus — accept raw DCF as-is.
+    if (a <= 0.20) {
       consensusFlag = "OK";
-      fairValue = rawDcfFair;
     } else if (a <= 0.40) {
-      // 15–40% gap — soft anchor at 50% DCF / 50% consensus.
       consensusFlag = "WARN";
-      fairValue = 0.5 * rawDcfFair + 0.5 * consensus;
       consensusDiagnosis = diagnoseGap(
         consensusGap, snapshot, wacc, ebitdaMarginStart, baseY1, nwcPctRev
       );
       notes.push(
-        `Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap) — soft-anchored to $${fairValue.toFixed(0)}. ${consensusDiagnosis}`
+        `Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap, WARN). ${consensusDiagnosis}`
       );
     } else {
-      // >40% gap — strong anchor at 25% DCF / 75% consensus + ALERT flag.
       consensusFlag = "ALERT";
-      fairValue = 0.25 * rawDcfFair + 0.75 * consensus;
       consensusDiagnosis = diagnoseGap(
         consensusGap, snapshot, wacc, ebitdaMarginStart, baseY1, nwcPctRev
       );
       notes.push(
-        `⚠ ALERT: Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap). Strongly anchored to $${fairValue.toFixed(0)}. ${consensusDiagnosis}`
+        `⚠ ALERT: Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap). ${consensusDiagnosis}`
       );
     }
-    consensusGapAnchored = fairValue / consensus - 1;
   }
+  const consensusGapAnchored = consensusGap; // Deprecated; kept for API back-compat
 
   const price = snapshot.price;
   const marginOfSafety = price > 0 ? (fairValue - price) / price : 0;
@@ -658,8 +781,9 @@ export function valuateCompany(
 
 /**
  * Inspect inputs and emit a short, plain-English best-guess for why the raw
- * DCF diverges materially from analyst consensus.  This is what the dashboard
- * shows when a stock is flagged WARN/ALERT.
+ * DCF diverges materially from analyst consensus. Displayed on the dashboard
+ * when a stock is flagged WARN/ALERT. NOTE: This is diagnostic only — the
+ * model no longer overrides fair value based on consensus.
  */
 function diagnoseGap(
   gap: number,
@@ -673,30 +797,30 @@ function diagnoseGap(
   const industry = snapshot.industry ?? "";
 
   if (gap > 0) {
-    // Raw DCF > consensus → model is too bullish
+    // Raw DCF > consensus → model is more bullish than the street
     if (sector === "Financial Services" &&
         (industry.includes("Insurance") || industry.includes("Capital Markets"))) {
-      return "Likely cause: holding-company structure — operating cash flow includes dividend income from a large public-equity portfolio, double-counting value already reflected in market cap. DCF is unsuitable for pure asset-allocators; anchored to consensus.";
+      return "Holding-company structure — operating cash flow double-counts dividend income from a public-equity portfolio already reflected in market cap. DCF is structurally unsuitable for pure asset-allocators.";
     }
     if (snapshot.ticker === "UNH" || (sector === "Healthcare" && y1Growth < 0.05)) {
-      return "Likely cause: historical financials look strong, but consensus reflects current impaired outlook (regulatory/legal headwinds) not yet visible in trailing fundamentals. Anchored to forward consensus.";
+      return "Trailing financials look strong but consensus reflects current impaired outlook (regulatory / legal headwinds) not yet visible in reported fundamentals. Sell-side is pricing forward, model is pricing backward.";
     }
     if (ebitdaMargin < 0.10 && wacc.wacc < 0.09) {
-      return "Likely cause: thin-margin business + low WACC produces an outsized terminal value sensitive to small input shifts. Anchored.";
+      return "Thin-margin business + low WACC produces an outsized terminal value highly sensitive to small input shifts. Consider the bear case as the more reliable signal.";
     }
-    return "Raw DCF exceeds analyst consensus — likely overstated terminal value or non-operating income inflating cash flow. Anchored toward consensus.";
+    return "Model is more bullish than sell-side — could be unmodeled cyclical headwinds, overstated terminal value, or genuine contrarian opportunity.";
   } else {
-    // Raw DCF < consensus → model is too bearish
+    // Raw DCF < consensus → model is more bearish than the street
     if (wacc.beta >= wacc.betaCeiling && y1Growth > 0.20) {
-      return "Likely cause: β capped at ceiling but WACC still punishingly high for hypergrowth; market accepts a lower equity risk premium for category leaders. Anchored toward consensus.";
+      return "β at our 1.5 ceiling but the street accepts a lower equity risk premium for category-leader growth names. DCF discounts hypergrowth more heavily than the market does for proven winners.";
     }
     if (y1Growth < 0.05 && ebitdaMargin > 0.25) {
-      return "Likely cause: low organic revenue growth (DCF can't model platform/services optionality, capital-return programs, or moat premiums). Anchored toward consensus.";
+      return "DCF can't model: services/platform optionality, capital-return programs at scale, brand/network moat premiums, or AI/feature monetization not yet in revenue. Consensus is pricing those — model isn't.";
     }
     if (nwcPct > 0.15) {
-      return "Likely cause: heavy NWC drag at growth scale compresses UFCF — sell-side models typically assume working-capital efficiency improves with scale. Anchored.";
+      return "Heavy NWC drag at growth scale compresses UFCF. Sell-side models typically assume working-capital efficiency improves with scale; this model holds NWC% constant.";
     }
-    return "Raw DCF below analyst consensus — possible underprojection of forward margins or growth. Anchored toward consensus.";
+    return "Model is more conservative than sell-side. Consider whether the bull case (which is internally consistent) better matches the market's narrative.";
   }
 }
 

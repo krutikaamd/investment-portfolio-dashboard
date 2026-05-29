@@ -181,9 +181,9 @@ function ConsensusFlag({ dcf }: { dcf: DcfResult }) {
           {label}
         </span>
         <span className="num text-xs font-semibold">
-          Raw DCF {fmtUSD(dcf.rawDcfFair)} → Anchored {fmtUSD(dcf.fairValue)}{" "}
+          DCF {fmtUSD(dcf.fairValue)}{" "}
           {dcf.consensusGap !== null
-            ? `(${(dcf.consensusGap * 100).toFixed(0)}% vs analyst)`
+            ? `(${dcf.consensusGap > 0 ? "+" : ""}${(dcf.consensusGap * 100).toFixed(0)}% vs analyst ${fmtUSD(dcf.snapshot.analystTargetMean)})`
             : ""}
         </span>
       </div>

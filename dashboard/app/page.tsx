@@ -91,6 +91,8 @@ export default function Page() {
             />
           )}
 
+          <WatchlistTable onSelectTicker={setSelectedTicker} />
+
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
             <AllocationPanel
               cash={cash}
@@ -109,8 +111,6 @@ export default function Page() {
               investment.
             </p>
           </div>
-
-          <WatchlistTable onSelectTicker={setSelectedTicker} />
 
           {selectedTicker && (
             <StockDetail
@@ -197,9 +197,10 @@ function ConsensusAlertBanner({
               ))}
           </div>
           <p className="text-[11px] text-ink-dim leading-relaxed">
-            Click a ticker to see the diagnostic explanation. Raw DCF values
-            outside ±25% of analyst consensus are soft-anchored to keep fair
-            values defensible.
+            Click a ticker to see the diagnostic explanation. The DCF is shown
+            as-is — no post-hoc anchoring. WARN/ALERT means the model
+            meaningfully disagrees with the street; review the bull/bear range
+            and the diagnosis to decide which view you trust.
           </p>
         </div>
       </div>
