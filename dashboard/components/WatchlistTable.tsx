@@ -198,7 +198,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                           {w.ticker}
                           <ExternalLink className="h-3 w-3 opacity-70" />
                         </Link>
-                        <span className="text-[11px] text-ink-fade truncate max-w-[160px]">
+                        <span className="text-[11px] text-ink-dim truncate max-w-[160px]">
                           {w.dcf.snapshot.longName}
                         </span>
                         {w.dcf.snapshot.sector && (

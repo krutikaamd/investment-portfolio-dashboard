@@ -68,7 +68,7 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                         {h.dcf.ticker}
                         <ExternalLink className="h-3 w-3 opacity-70" />
                       </Link>
-                      <span className="text-[11px] text-ink-fade truncate max-w-[160px]">
+                      <span className="text-[11px] text-ink-dim truncate max-w-[160px]">
                         {h.dcf.snapshot.longName}
                       </span>
                       {h.dcf.snapshot.sector && (

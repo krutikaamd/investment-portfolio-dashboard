@@ -98,7 +98,7 @@ export default function StockDeepDivePage() {
                 <h1 className="text-base font-semibold leading-tight">
                   {ticker} — Full DCF Model
                 </h1>
-                <p className="text-[11px] text-ink-fade">
+                <p className="text-[11px] text-ink-dim">
                   {data?.dcf.snapshot.longName ?? "Loading…"}
                 </p>
               </div>
@@ -223,7 +223,7 @@ function HeroCard({
               {dcf.ticker}
             </span>
           </div>
-          <div className="text-[12px] text-ink-fade">
+          <div className="text-[12px] text-ink-dim">
             {s.sector ?? "—"}
             {s.industry ? ` • ${s.industry}` : ""}
           </div>

@@ -52,7 +52,7 @@ export function StockDetail({
             {ticker} — Quick DCF Preview
           </h2>
           {data && (
-            <div className="text-[11px] text-ink-fade mt-0.5">
+            <div className="text-[11px] text-ink-dim mt-0.5">
               {data.dcf.snapshot.longName} • {data.dcf.snapshot.sector ?? "—"}
               {data.dcf.snapshot.industry
                 ? ` • ${data.dcf.snapshot.industry}`

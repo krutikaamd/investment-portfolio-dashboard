@@ -20,8 +20,8 @@ const config: Config = {
         },
         ink: {
           DEFAULT: "#e8e8ee",
-          dim: "#9292a3",
-          fade: "#5f5f70",
+          dim: "#b4b4c2",
+          fade: "#8a8a9d",
         },
         accent: {
           DEFAULT: "#7c5cff",
