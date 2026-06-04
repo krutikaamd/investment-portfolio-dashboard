@@ -25,6 +25,7 @@ export interface AllocationRecommendation {
   sharesToAdd: number;
   marginOfSafety: number;
   reason: string;
+  fromWatchlist?: boolean; // True if this ticker isn't currently held but is on the watchlist
 }
 
 export interface PortfolioValuation {
@@ -131,13 +132,17 @@ export function valuePortfolio(
  */
 export function allocate(
   portfolio: PortfolioValuation,
-  cashToInvest: number
+  cashToInvest: number,
+  watchlistTickers: Set<string> = new Set()
 ): {
   recommendations: AllocationRecommendation[];
   cashDeployed: number;
   cashRemaining: number;
   newTotalValue: number;
 } {
+  const isWatchlist = (ticker: string) =>
+    watchlistTickers.has(ticker.toUpperCase());
+
   if (cashToInvest <= 0) {
     return {
       recommendations: portfolio.holdings.map((h) => ({
@@ -147,6 +152,7 @@ export function allocate(
         sharesToAdd: 0,
         marginOfSafety: h.dcf.marginOfSafety,
         reason: "No new capital to deploy.",
+        fromWatchlist: isWatchlist(h.dcf.ticker) && h.holding.shares === 0,
       })),
       cashDeployed: 0,
       cashRemaining: 0,
@@ -154,7 +160,8 @@ export function allocate(
     };
   }
 
-  // Allocate cash *proportionally to MoS* among positive-MoS names only.
+  // Allocate cash *proportionally to MoS* among positive-MoS names only
+  // (positions you actually hold AND positive-MoS watchlist candidates).
   const positiveScores = portfolio.holdings.map((h) =>
     Math.max(0, h.dcf.marginOfSafety)
   );
@@ -165,6 +172,9 @@ export function allocate(
     const mos = h.dcf.marginOfSafety;
     const price = h.dcf.snapshot.price;
     const cw = h.currentWeight;
+    // Watchlist-sourced flag: ticker is on the watchlist AND not currently
+    // a real held position (shares == 0 in the phantom-holding pipeline).
+    const fromWatchlist = isWatchlist(h.dcf.ticker) && h.holding.shares === 0;
 
     if (mos > 0 && !noUndervaluedNames) {
       const share = positiveScores[i] / totalScore;
@@ -172,21 +182,44 @@ export function allocate(
       const sharesToAdd = price > 0 ? dollars / price : 0;
       const action: AllocationRecommendation["action"] =
         cw < 0.01 ? "INITIATE" : "OVERWEIGHT";
+      let reason: string;
+      if (fromWatchlist) {
+        reason = `On your watchlist; DCF margin of safety ${(mos * 100).toFixed(1)}% — open a position.`;
+      } else if (action === "INITIATE") {
+        reason = `Currently <1% weight; DCF margin of safety ${(mos * 100).toFixed(1)}% — build a position.`;
+      } else {
+        reason = `Margin of safety ${(mos * 100).toFixed(1)}%. ${
+          share > 0.4
+            ? "Largest pool of fair value in portfolio."
+            : "Add to overweight."
+        }`;
+      }
       return {
         ticker: h.dcf.ticker,
         action,
         dollarsToAdd: dollars,
         sharesToAdd,
         marginOfSafety: mos,
-        reason:
-          action === "INITIATE"
-            ? `Currently <1% weight; DCF margin of safety ${(mos * 100).toFixed(1)}% — build a position.`
-            : `Margin of safety ${(mos * 100).toFixed(1)}%. ${share > 0.4 ? "Largest pool of fair value in portfolio." : "Add to overweight."}`,
+        reason,
+        fromWatchlist,
       };
     }
 
     if (mos < -0.10) {
       const trimPct = Math.min(0.5, -mos);
+      // Don't show TRIM/UNDERWEIGHT advice for watchlist stocks — you don't
+      // own them. Just show as HOLD (skip).
+      if (fromWatchlist) {
+        return {
+          ticker: h.dcf.ticker,
+          action: "HOLD",
+          dollarsToAdd: 0,
+          sharesToAdd: 0,
+          marginOfSafety: mos,
+          reason: `On your watchlist; trading ${(Math.abs(mos) * 100).toFixed(1)}% above DCF fair value — wait for a better entry.`,
+          fromWatchlist,
+        };
+      }
       const action: AllocationRecommendation["action"] =
         mos < -0.25 ? "TRIM" : "UNDERWEIGHT";
       return {
@@ -199,6 +232,7 @@ export function allocate(
           action === "TRIM"
             ? `Trading ${(Math.abs(mos) * 100).toFixed(1)}% above DCF fair value — consider trimming up to ${(trimPct * 100).toFixed(0)}% of the position.`
             : `Price is ${(Math.abs(mos) * 100).toFixed(1)}% above DCF fair value — no new capital; consider light trim.`,
+        fromWatchlist: false,
       };
     }
 
@@ -208,10 +242,12 @@ export function allocate(
       dollarsToAdd: 0,
       sharesToAdd: 0,
       marginOfSafety: mos,
-      reason:
-        noUndervaluedNames && mos >= -0.10
+      reason: fromWatchlist
+        ? `On your watchlist; within ±10% of fair value (${(mos * 100).toFixed(1)}%) — wait for a better entry.`
+        : noUndervaluedNames && mos >= -0.10
           ? "Nothing in portfolio is meaningfully undervalued — cash should sit idle until prices improve."
           : `Within ±10% of fair value (${(mos * 100).toFixed(1)}%) — hold.`,
+      fromWatchlist,
     };
   });
 

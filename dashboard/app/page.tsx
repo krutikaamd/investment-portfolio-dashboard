@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, RefreshCw, Settings2 } from "lucide-react";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
+import { ReturnsRibbon } from "@/components/ReturnsRibbon";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { AllocationPanel } from "@/components/AllocationPanel";
 import { StockDetail } from "@/components/StockDetail";
@@ -96,6 +97,8 @@ export default function Page() {
           )}
         </section>
 
+        {data && data.portfolio.holdings.length > 0 && <ReturnsRibbon />}
+
         <section className="space-y-6">
           {data && (
             <HoldingsTable
@@ -115,6 +118,7 @@ export default function Page() {
               cashDeployed={data?.allocation.cashDeployed ?? 0}
               cashRemaining={data?.allocation.cashRemaining ?? cash}
               loading={loading && !data}
+              onInvested={() => load(cash)}
             />
             <p className="text-[11px] text-ink-fade leading-relaxed px-1 xl:pt-2">
               <strong className="text-ink-dim">How this works:</strong> Yahoo

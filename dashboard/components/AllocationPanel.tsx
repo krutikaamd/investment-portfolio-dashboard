@@ -4,7 +4,15 @@ import { useState, useMemo } from "react";
 import { cn, fmtNum, fmtSignedPct, fmtUSD } from "@/lib/utils";
 import type { AllocationRecommendation } from "@/lib/allocate";
 import { VerdictBadge } from "./VerdictBadge";
-import { ArrowUpRight, ArrowDownRight, Minus, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Sparkles,
+  Check,
+  Loader2,
+  Eye,
+} from "lucide-react";
 
 interface Props {
   cash: number;
@@ -13,6 +21,7 @@ interface Props {
   cashDeployed: number;
   cashRemaining: number;
   loading?: boolean;
+  onInvested?: () => void;
 }
 
 const QUICK_AMOUNTS = [1000, 2500, 5000, 10000, 25000];
@@ -24,6 +33,7 @@ export function AllocationPanel({
   cashDeployed,
   cashRemaining,
   loading = false,
+  onInvested,
 }: Props) {
   const [draft, setDraft] = useState(String(cash));
 
@@ -113,7 +123,7 @@ export function AllocationPanel({
           </div>
         )}
         {!loading && sorted.map((r) => (
-          <RecommendationRow key={r.ticker} r={r} />
+          <RecommendationRow key={r.ticker} r={r} onInvested={onInvested} />
         ))}
         {!loading && sorted.length === 0 && (
           <div className="px-6 py-10 text-center text-ink-fade text-sm">
@@ -125,9 +135,71 @@ export function AllocationPanel({
   );
 }
 
-function RecommendationRow({ r }: { r: AllocationRecommendation }) {
+type InvestState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; sharesAdded: number; dollars: number }
+  | { kind: "error"; msg: string };
+
+function RecommendationRow({
+  r,
+  onInvested,
+}: {
+  r: AllocationRecommendation;
+  onInvested?: () => void;
+}) {
   const isBuy = r.action === "OVERWEIGHT" || r.action === "INITIATE";
   const isTrim = r.action === "TRIM" || r.action === "UNDERWEIGHT";
+  const [state, setState] = useState<InvestState>({ kind: "idle" });
+
+  const canInvest = isBuy && r.dollarsToAdd > 0 && r.sharesToAdd > 0;
+  const pricePerShare =
+    r.sharesToAdd > 0 ? r.dollarsToAdd / r.sharesToAdd : 0;
+
+  async function invest() {
+    if (!canInvest || state.kind === "loading") return;
+    const sharesPretty = fmtNum(r.sharesToAdd, r.sharesToAdd < 1 ? 4 : 2);
+    const ok = window.confirm(
+      `Add ${sharesPretty} shares of ${r.ticker} at ${fmtUSD(pricePerShare)} ` +
+        `(≈ ${fmtUSD(r.dollarsToAdd)}) to your portfolio?\n\n` +
+        `This will update your holdings and recompute allocation.`
+    );
+    if (!ok) return;
+    setState({ kind: "loading" });
+    try {
+      const resp = await fetch("/api/portfolio/invest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: r.ticker,
+          shares: r.sharesToAdd,
+          price: pricePerShare,
+        }),
+      });
+      const j = (await resp.json().catch(() => ({}))) as {
+        error?: string;
+        sharesAdded?: number;
+        dollarsInvested?: number;
+      };
+      if (!resp.ok) {
+        throw new Error(j.error ?? `Invest failed (${resp.status})`);
+      }
+      setState({
+        kind: "done",
+        sharesAdded: j.sharesAdded ?? r.sharesToAdd,
+        dollars: j.dollarsInvested ?? r.dollarsToAdd,
+      });
+      // Refresh allocations after a short pause so the user sees the
+      // success state on the button before it re-renders.
+      setTimeout(() => onInvested?.(), 600);
+    } catch (e) {
+      setState({
+        kind: "error",
+        msg: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
   return (
     <div className="px-6 py-4 flex items-center gap-4 hover:bg-bg-hover transition">
       <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg-elev">
@@ -136,30 +208,73 @@ function RecommendationRow({ r }: { r: AllocationRecommendation }) {
         {!isBuy && !isTrim && <Minus className="h-4 w-4 text-ink-fade" />}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold">{r.ticker}</span>
           <VerdictBadge verdict={r.action} />
+          {r.fromWatchlist && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-cyan/15 text-cyan ring-1 ring-cyan/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+              title="From your watchlist (not currently held)"
+            >
+              <Eye className="h-2.5 w-2.5" />
+              Watchlist
+            </span>
+          )}
           <span
             className={cn(
-              "text-xs num",
-              r.marginOfSafety > 0 ? "text-pos" : "text-neg"
+              "rounded-md px-1.5 py-0.5 text-sm font-semibold num text-ink ring-1",
+              r.marginOfSafety > 0
+                ? "bg-pos/20 ring-pos/50"
+                : "bg-neg/20 ring-neg/50"
             )}
           >
             MoS {fmtSignedPct(r.marginOfSafety)}
           </span>
         </div>
-        <div className="text-[12px] text-ink-fade mt-0.5 truncate">{r.reason}</div>
+        <div className="text-[12px] text-ink-dim mt-1 truncate">{r.reason}</div>
+        {state.kind === "error" && (
+          <div className="text-[11px] text-neg mt-1">⚠ {state.msg}</div>
+        )}
       </div>
       <div className="text-right">
         <div className="num font-semibold">
           {r.dollarsToAdd > 0 ? `+${fmtUSD(r.dollarsToAdd)}` : "—"}
         </div>
-        <div className="text-[11px] text-ink-fade num">
+        <div className="text-[11px] text-ink-dim num">
           {r.sharesToAdd > 0
-            ? `${fmtNum(r.sharesToAdd, r.sharesToAdd < 1 ? 4 : 2)} shares`
+            ? `${fmtNum(r.sharesToAdd, r.sharesToAdd < 1 ? 4 : 2)} shares @ ${fmtUSD(pricePerShare)}`
             : ""}
         </div>
       </div>
+      {canInvest && (
+        <button
+          onClick={invest}
+          disabled={state.kind === "loading" || state.kind === "done"}
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider ring-1 transition shrink-0",
+            state.kind === "done"
+              ? "bg-pos/20 text-pos ring-pos/50 cursor-default"
+              : state.kind === "loading"
+                ? "bg-accent/15 text-accent-glow ring-accent/40 cursor-wait"
+                : "bg-accent text-white ring-accent/60 hover:bg-accent/90 shadow-glow"
+          )}
+          title={
+            state.kind === "done"
+              ? "Already invested"
+              : `Invest ${fmtUSD(r.dollarsToAdd)} into ${r.ticker}`
+          }
+        >
+          {state.kind === "loading" && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          )}
+          {state.kind === "done" && <Check className="h-3.5 w-3.5" />}
+          {state.kind === "done"
+            ? "Invested"
+            : state.kind === "loading"
+              ? "Investing…"
+              : "Invest"}
+        </button>
+      )}
     </div>
   );
 }

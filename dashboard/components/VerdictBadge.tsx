@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
 
 const palette: Record<string, string> = {
-  BUY: "bg-pos/20 text-pos ring-pos/40",
-  ACCUMULATE: "bg-pos/15 text-pos ring-pos/30",
-  HOLD: "bg-ink-dim/15 text-ink-dim ring-ink-dim/30",
-  TRIM: "bg-warn/15 text-warn ring-warn/30",
-  SELL: "bg-neg/20 text-neg ring-neg/40",
-  OVERWEIGHT: "bg-accent/20 text-accent-glow ring-accent/40",
-  INITIATE: "bg-cyan/15 text-cyan ring-cyan/40",
-  UNDERWEIGHT: "bg-ink-dim/15 text-ink-dim ring-ink-dim/30",
+  BUY: "bg-pos/30 text-ink ring-pos/60",
+  ACCUMULATE: "bg-pos/25 text-ink ring-pos/50",
+  HOLD: "bg-ink-dim/25 text-ink ring-ink-dim/50",
+  TRIM: "bg-warn/25 text-ink ring-warn/55",
+  SELL: "bg-neg/30 text-ink ring-neg/60",
+  OVERWEIGHT: "bg-accent/30 text-ink ring-accent/60",
+  INITIATE: "bg-cyan/25 text-ink ring-cyan/55",
+  UNDERWEIGHT: "bg-ink-dim/25 text-ink ring-ink-dim/50",
 };
 
 export function VerdictBadge({

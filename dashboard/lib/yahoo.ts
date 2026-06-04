@@ -20,6 +20,12 @@ type YahooClient = {
     query: string,
     opts?: { newsCount?: number; quotesCount?: number; enableFuzzyQuery?: boolean }
   ) => Promise<{ news?: Record<string, unknown>[] }>;
+  chart: (
+    symbol: string,
+    opts: { period1: string; period2?: string; interval: string }
+  ) => Promise<{
+    quotes?: { date: Date | string; close: number | null; adjclose?: number | null }[];
+  }>;
 };
 type YahooCtor = new (opts?: Record<string, unknown>) => YahooClient;
 
@@ -510,4 +516,65 @@ export async function getPortfolioNews(
     .sort((a, b) => b.score - a.score)
     .map(({ item }) => item);
   return ranked.slice(0, topN);
+}
+
+/* ───────────────────────── Historical prices ───────────────────────── */
+
+export interface PriceBar {
+  date: string; // YYYY-MM-DD
+  close: number;
+}
+
+const historyCache = new Map<string, { t: number; data: PriceBar[] }>();
+const HISTORY_TTL_MS = 60 * 60 * 1000; // 1h — historical closes don't change
+
+/**
+ * Fetch daily closes for `ticker` from `fromDate` (inclusive) to today.
+ * Uses Yahoo's chart endpoint. Falls back to adjusted close if close is null
+ * (handles splits/dividends gracefully). Cached for 1 hour per symbol.
+ */
+export async function getHistoricalCloses(
+  ticker: string,
+  fromDate: Date
+): Promise<PriceBar[]> {
+  const key = `${ticker.toUpperCase()}|${fromDate.toISOString().slice(0, 10)}`;
+  const now = Date.now();
+  const hit = historyCache.get(key);
+  if (hit && now - hit.t < HISTORY_TTL_MS) return hit.data;
+
+  const period1 = fromDate.toISOString().slice(0, 10);
+  let raw: { quotes?: { date: Date | string; close: number | null; adjclose?: number | null }[] };
+  try {
+    raw = await yf.chart(ticker.toUpperCase(), {
+      period1,
+      interval: "1d",
+    });
+  } catch {
+    historyCache.set(key, { t: now, data: [] });
+    return [];
+  }
+
+  const bars: PriceBar[] = (raw.quotes ?? [])
+    .map((q) => {
+      const date = isoDate(q.date);
+      const close =
+        typeof q.close === "number" && isFinite(q.close)
+          ? q.close
+          : typeof q.adjclose === "number" && isFinite(q.adjclose)
+            ? q.adjclose
+            : null;
+      if (!date || close === null) return null;
+      return { date, close } as PriceBar;
+    })
+    .filter((x): x is PriceBar => x !== null);
+
+  // De-dupe (rare Yahoo quirk where the same date appears twice) and sort.
+  const byDate = new Map<string, number>();
+  for (const b of bars) byDate.set(b.date, b.close);
+  const deduped = [...byDate.entries()]
+    .map(([date, close]) => ({ date, close }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  historyCache.set(key, { t: now, data: deduped });
+  return deduped;
 }
