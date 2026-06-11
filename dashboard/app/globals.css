@@ -2,20 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Dark is the default (:root and [data-theme="dark"]); light mode
+ * is opt-in via [data-theme="light"] on <html>. Values are space-separated RGB
+ * channels so Tailwind's rgb(var(--x) / <alpha>) tokens support /opacity.
+ */
+:root,
+[data-theme="dark"] {
+  --c-bg: 10 12 18;
+  --c-bg-elev: 18 21 31;
+  --c-bg-card: 22 26 38;
+  --c-bg-hover: 30 35 49;
+  --c-line: 41 48 64;
+  --c-line-strong: 57 65 86;
+  /* Brighter ink than before — was dim #b8bcca / fade #8b90a3. Bumped toward
+     white so secondary text reads cleanly on the dark base. */
+  --c-ink: 240 242 248;
+  --c-ink-dim: 216 220 230;
+  --c-ink-fade: 173 179 195;
+
+  --body-base: #0a0c12;
+  --grid-line: 255 255 255;
+  --grid-alpha: 0.018;
+}
+
+[data-theme="light"] {
+  --c-bg: 244 246 250;
+  --c-bg-elev: 255 255 255;
+  --c-bg-card: 255 255 255;
+  --c-bg-hover: 236 240 247;
+  --c-line: 214 220 230;
+  --c-line-strong: 190 198 212;
+  --c-ink: 17 23 38;
+  --c-ink-dim: 58 67 86;
+  --c-ink-fade: 96 105 124;
+
+  --body-base: #eef1f7;
+  --grid-line: 30 41 80;
+  --grid-alpha: 0.04;
+}
+
 @layer base {
   html,
   body {
-    background: #0a0a0f;
-    color: #e8e8ee;
+    background: var(--body-base);
+    color: rgb(var(--c-ink));
     font-feature-settings: "cv02", "cv03", "cv04", "ss01";
   }
 
   body {
+    /* Layered ambient mesh — cool base with soft purple/cyan/indigo glows
+       plus a faint hairline grid for depth. */
     background-image:
-      radial-gradient(circle at 15% -10%, rgba(124, 92, 255, 0.10), transparent 45%),
-      radial-gradient(circle at 90% 110%, rgba(34, 211, 238, 0.06), transparent 50%);
+      radial-gradient(circle at 12% -8%, rgba(124, 92, 255, 0.16), transparent 42%),
+      radial-gradient(circle at 88% 6%, rgba(56, 120, 255, 0.10), transparent 40%),
+      radial-gradient(circle at 92% 108%, rgba(34, 211, 238, 0.09), transparent 48%),
+      radial-gradient(circle at 30% 120%, rgba(124, 92, 255, 0.07), transparent 50%),
+      linear-gradient(180deg, color-mix(in srgb, var(--body-base) 88%, #ffffff) 0%, var(--body-base) 60%);
     background-attachment: fixed;
     min-height: 100vh;
+    position: relative;
+  }
+
+  /* Faint grid overlay for a technical, "cooler" feel. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(rgb(var(--grid-line) / var(--grid-alpha)) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--grid-line) / var(--grid-alpha)) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 75%);
   }
 
   ::selection {
@@ -39,11 +100,11 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: #2a2a3a;
+    background: rgb(var(--c-line-strong));
     border-radius: 6px;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: #3a3a4d;
+    background: rgb(var(--c-ink-fade));
   }
 
   input,
@@ -55,11 +116,25 @@
 }
 
 @layer components {
+  /* Glassy card: translucent so the ambient mesh shows through, a gradient
+     hairline edge, a top sheen highlight, and layered depth shadow. */
   .card {
-    @apply rounded-2xl border border-line bg-bg-card shadow-card;
+    @apply relative rounded-2xl border border-line/70 bg-bg-card/80 shadow-card backdrop-blur-xl;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0) 18%
+    );
   }
   .card-elev {
-    @apply rounded-2xl border border-line bg-bg-elev;
+    @apply relative rounded-2xl border border-line/60 bg-bg-elev/70 backdrop-blur-md;
   }
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
@@ -69,5 +144,13 @@
   }
   .label-eyebrow {
     @apply text-[10px] font-medium uppercase tracking-[0.14em] text-ink-fade;
+  }
+}
+
+@layer utilities {
+  /* Gradient text for hero headings / key figures. */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #eef0f6 0%, #a78bfa 55%, #22d3ee 120%);
   }
 }

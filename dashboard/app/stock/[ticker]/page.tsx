@@ -23,12 +23,12 @@ import { VerdictBadge } from "@/components/VerdictBadge";
 import type { DcfResult, ScenarioOutput, YearProjection } from "@/lib/dcf";
 import {
   ConsensusFlag,
-  ScenarioChart,
   ScenarioTable,
   SensitivityHeatmap,
   WaccBreakdown,
   type SensitivityPayload,
 } from "@/components/DcfSections";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface ApiResponse {
   dcf: DcfResult;
@@ -79,7 +79,7 @@ export default function StockDeepDivePage() {
   }, [ticker]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative z-10">
       <header className="border-b border-line/60 bg-bg-elev/40 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-[1440px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -125,6 +125,7 @@ export default function StockDeepDivePage() {
               />
               Refresh
             </button>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -165,8 +166,6 @@ function DeepDiveBody({ data, ticker }: { data: ApiResponse; ticker: string }) {
       <ModelDriversCard dcf={dcf} />
 
       <WaccBreakdown dcf={dcf} />
-
-      <ScenarioChart dcf={dcf} />
 
       <ScenarioTable dcf={dcf} />
 

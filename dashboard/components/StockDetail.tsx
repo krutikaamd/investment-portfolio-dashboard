@@ -9,7 +9,6 @@ import type { DcfResult } from "@/lib/dcf";
 import { X, ExternalLink } from "lucide-react";
 import {
   ConsensusFlag,
-  ScenarioChart,
   ScenarioTable,
   SensitivityHeatmap,
   WaccBreakdown,
@@ -147,8 +146,6 @@ function Content({ data, ticker }: { data: ApiResponse; ticker: string }) {
       )}
 
       <WaccBreakdown dcf={dcf} />
-
-      <ScenarioChart dcf={dcf} />
 
       <ScenarioTable dcf={dcf} />
 

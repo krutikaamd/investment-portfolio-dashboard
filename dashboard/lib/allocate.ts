@@ -1,9 +1,22 @@
 import type { DcfResult } from "./dcf";
 
+export interface Transaction {
+  date: string; // ISO date (YYYY-MM-DD)
+  type: "BUY" | "SELL";
+  shares: number;
+  price: number; // execution price per share
+}
+
 export interface Holding {
   ticker: string;
   shares: number;
   avgCost: number;
+  /**
+   * Optional ledger of buys/sells for this position. When present it's
+   * surfaced in the per-stock dropdown. Net shares should reconcile to
+   * `shares`, and the share-weighted average of buy prices to `avgCost`.
+   */
+  transactions?: Transaction[];
 }
 
 export interface ValuedHolding {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Newspaper, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NewsItem {
@@ -51,7 +51,7 @@ export function NewsFeed({ portfolioTickers, onSelectTicker }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch(`/api/news?perTicker=8&topN=10&t=${Date.now()}`, {
+      const resp = await fetch(`/api/news?perTicker=8&topN=12&t=${Date.now()}`, {
         cache: "no-store",
       });
       if (!resp.ok) {
@@ -99,7 +99,7 @@ export function NewsFeed({ portfolioTickers, onSelectTicker }: Props) {
             Top Headlines
           </h2>
           <span className="label-eyebrow">
-            Top 10 · Yahoo Finance
+            Top 12 · Yahoo Finance
           </span>
         </div>
         <button
@@ -132,32 +132,34 @@ export function NewsFeed({ portfolioTickers, onSelectTicker }: Props) {
         ))}
       </div>
 
-      <div className="divide-y divide-line/60">
-        {error && (
-          <div className="px-5 py-6 text-sm text-neg">{error}</div>
-        )}
+      <div className="p-4">
+        {error && <div className="px-1 py-4 text-sm text-neg">{error}</div>}
         {!error && loading && !news && (
-          <div className="px-5 py-8 text-sm text-ink-fade">
+          <div className="px-1 py-6 text-sm text-ink-fade">
             Fetching latest headlines…
           </div>
         )}
         {!error && news && filtered.length === 0 && (
-          <div className="px-5 py-8 text-sm text-ink-fade">
+          <div className="px-1 py-6 text-sm text-ink-fade">
             No recent headlines for {filter === "ALL" ? "your portfolio" : filter}.
           </div>
         )}
-        {filtered.map((item) => (
-          <NewsRow
-            key={item.uuid}
-            item={item}
-            onTickerClick={(t) => {
-              if (portfolioTickers.includes(t) && onSelectTicker) {
-                onSelectTicker(t);
-              }
-            }}
-            portfolioTickers={portfolioTickers}
-          />
-        ))}
+        {filtered.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filtered.map((item) => (
+              <NewsCard
+                key={item.uuid}
+                item={item}
+                onTickerClick={(t) => {
+                  if (portfolioTickers.includes(t) && onSelectTicker) {
+                    onSelectTicker(t);
+                  }
+                }}
+                portfolioTickers={portfolioTickers}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -199,7 +201,7 @@ function FilterChip({
   );
 }
 
-function NewsRow({
+function NewsCard({
   item,
   onTickerClick,
   portfolioTickers,
@@ -210,47 +212,44 @@ function NewsRow({
 }) {
   const allTickers = Array.from(
     new Set([item.ticker, ...item.relatedTickers])
-  ).slice(0, 4);
+  ).slice(0, 3);
   return (
     <a
       href={item.link}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex gap-4 px-5 py-4 hover:bg-bg-hover transition-colors"
+      className="group flex flex-col rounded-xl border border-line/70 bg-bg-elev/40 overflow-hidden hover:border-line-strong hover:bg-bg-hover transition-colors"
     >
       {item.thumbnail ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={item.thumbnail}
           alt=""
-          className="hidden sm:block h-16 w-16 rounded-md object-cover flex-shrink-0 bg-bg-elev"
+          className="h-24 w-full object-cover bg-bg-elev"
           onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
+            (e.target as HTMLImageElement).style.visibility = "hidden";
           }}
         />
       ) : (
-        <div className="hidden sm:flex h-16 w-16 rounded-md bg-bg-elev flex-shrink-0 items-center justify-center text-ink-fade">
-          <Newspaper className="h-5 w-5" />
+        <div className="h-24 w-full bg-gradient-to-br from-bg-elev to-bg-card flex items-center justify-center text-ink-fade">
+          <Newspaper className="h-6 w-6" />
         </div>
       )}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 text-[10px] text-ink-fade uppercase tracking-wide mb-1">
-          <span className="font-semibold text-ink-dim">{item.publisher}</span>
+      <div className="flex flex-1 flex-col p-3">
+        <div className="flex items-center gap-1.5 text-[9px] text-ink-fade uppercase tracking-wide mb-1.5">
+          <span className="font-semibold text-ink-dim truncate max-w-[60%]">
+            {item.publisher}
+          </span>
           <span>•</span>
-          <span>{relativeTime(item.publishedAt)}</span>
-          {item.type && item.type !== "STORY" && (
-            <>
-              <span>•</span>
-              <span className="text-cyan">{item.type}</span>
-            </>
-          )}
+          <span className="whitespace-nowrap">
+            {relativeTime(item.publishedAt)}
+          </span>
         </div>
-        <h3 className="text-sm font-medium leading-snug text-ink group-hover:text-accent-glow transition-colors">
+        <h3 className="text-[12.5px] font-medium leading-snug text-ink group-hover:text-accent-glow transition-colors line-clamp-3">
           {item.title}
-          <ExternalLink className="inline-block h-3 w-3 ml-1.5 opacity-50 align-baseline" />
         </h3>
         {allTickers.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div className="flex flex-wrap gap-1 mt-auto pt-2.5">
             {allTickers.map((t) => {
               const inPortfolio = portfolioTickers.includes(t);
               return (
@@ -263,7 +262,7 @@ function NewsRow({
                     onTickerClick(t);
                   }}
                   className={cn(
-                    "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold leading-none transition",
+                    "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold leading-none transition",
                     inPortfolio
                       ? "bg-cyan/15 text-cyan hover:bg-cyan/25"
                       : "bg-bg-elev text-ink-fade cursor-default"

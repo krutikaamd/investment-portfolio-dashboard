@@ -52,6 +52,12 @@ export async function POST(req: Request) {
   );
 
   const dollars = shares * price;
+  const buyTxn = {
+    date: new Date().toISOString().slice(0, 10),
+    type: "BUY" as const,
+    shares,
+    price,
+  };
   let updatedHolding: Holding;
 
   if (idx >= 0) {
@@ -65,10 +71,16 @@ export async function POST(req: Request) {
       ticker: existing.ticker.toUpperCase(),
       shares: newShares,
       avgCost: newAvgCost,
+      transactions: [...(existing.transactions ?? []), buyTxn],
     };
     portfolio.holdings[idx] = updatedHolding;
   } else {
-    updatedHolding = { ticker, shares, avgCost: price };
+    updatedHolding = {
+      ticker,
+      shares,
+      avgCost: price,
+      transactions: [buyTxn],
+    };
     portfolio.holdings.push(updatedHolding);
   }
 

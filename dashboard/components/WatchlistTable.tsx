@@ -1,11 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, ExternalLink, Plus, RefreshCw, X } from "lucide-react";
+import { ChevronDown, Eye, ExternalLink, Plus, RefreshCw, X } from "lucide-react";
 import { cn, fmtPct, fmtSignedPct, fmtUSD, tone } from "@/lib/utils";
 import { VerdictBadge } from "./VerdictBadge";
+import { MiniPriceChart } from "./MiniPriceChart";
 import type { DcfResult } from "@/lib/dcf";
+
+const WATCH_COL_SPAN = 12;
 
 interface WatchlistItem {
   ticker: string;
@@ -28,6 +31,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
   const [addTicker, setAddTicker] = useState("");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -128,7 +132,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
         <input
           value={addTicker}
           onChange={(e) => setAddTicker(e.target.value.toUpperCase())}
-          placeholder="Add ticker (e.g. TSLA)"
+          placeholder="Add ticker (e.g. META)"
           maxLength={10}
           className="flex-1 min-w-[140px] rounded-md border border-line bg-bg px-3 py-1.5 text-sm font-medium uppercase tracking-wide placeholder:text-ink-fade placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-accent/60"
         />
@@ -175,17 +179,22 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                 <th className="px-5 py-3 font-medium">Verdict</th>
                 <th className="px-3 py-3 font-medium text-right">Model</th>
                 <th className="px-3 py-3 font-medium"></th>
+                <th className="px-3 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
               {sorted.map((w) => {
                 const perfTone = tone(w.performanceSinceAdded);
                 const mosTone = tone(w.dcf.marginOfSafety);
+                const isOpen = expanded === w.ticker;
                 return (
+                  <Fragment key={w.ticker}>
                   <tr
-                    key={w.ticker}
                     onClick={() => onSelectTicker?.(w.ticker)}
-                    className="border-b border-line/60 hover:bg-bg-hover transition-colors cursor-pointer"
+                    className={cn(
+                      "border-b border-line/60 hover:bg-bg-hover transition-colors cursor-pointer",
+                      isOpen && "bg-bg-hover"
+                    )}
                   >
                     <td className="px-5 py-3.5">
                       <div className="flex flex-col gap-0.5">
@@ -296,13 +305,104 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </td>
+                    <td className="px-3 py-3.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpanded(isOpen ? null : w.ticker);
+                        }}
+                        title={isOpen ? "Hide details" : "Show 6-month chart"}
+                        aria-expanded={isOpen}
+                        className="inline-flex items-center justify-center h-6 w-6 rounded text-ink-fade hover:text-ink hover:bg-bg-elev transition"
+                      >
+                        <ChevronDown
+                          className={cn(
+                            "h-4 w-4 transition-transform",
+                            isOpen && "rotate-180"
+                          )}
+                        />
+                      </button>
+                    </td>
                   </tr>
+                  {isOpen && (
+                    <tr className="border-b border-line/60 bg-bg-elev/30">
+                      <td colSpan={WATCH_COL_SPAN} className="px-5 py-5">
+                        <WatchlistDetail w={w} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
           </table>
         )}
       </div>
+    </div>
+  );
+}
+
+function WatchlistDetail({ w }: { w: WatchlistItem }) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+      <div className="card-elev p-4">
+        <MiniPriceChart ticker={w.ticker} months={6} />
+      </div>
+      <div className="card-elev p-4 space-y-3">
+        <span className="label-eyebrow">Watch Notes</span>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <Field label="Added" value={new Date(w.addedAt).toLocaleDateString()} />
+          <Field label="Added at price" value={fmtUSD(w.addedAtPrice)} />
+          <Field
+            label="Since added"
+            value={fmtSignedPct(w.performanceSinceAdded)}
+            tone={tone(w.performanceSinceAdded)}
+          />
+          <Field label="Days tracked" value={`${w.daysHeld}d`} />
+          <Field label="DCF fair value" value={fmtUSD(w.dcf.fairValue)} accent />
+          <Field
+            label="Margin of safety"
+            value={fmtSignedPct(w.dcf.marginOfSafety)}
+            tone={tone(w.dcf.marginOfSafety)}
+          />
+        </div>
+        {w.note && (
+          <p className="text-[12px] text-ink-dim leading-relaxed border-t border-line/60 pt-3">
+            {w.note}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  tone: t,
+  accent,
+}: {
+  label: string;
+  value: string;
+  tone?: "pos" | "neg" | "neutral";
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] uppercase tracking-wider text-ink-fade">
+        {label}
+      </span>
+      <span
+        className={cn(
+          "num font-medium",
+          accent && "text-accent-glow",
+          t === "pos" && "text-pos",
+          t === "neg" && "text-neg"
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }

@@ -1,10 +1,14 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { cn, fmtNum, fmtPct, fmtSignedPct, fmtUSD, tone } from "@/lib/utils";
-import type { ValuedHolding } from "@/lib/allocate";
+import type { Transaction, ValuedHolding } from "@/lib/allocate";
 import { VerdictBadge } from "./VerdictBadge";
+import { MiniPriceChart } from "./MiniPriceChart";
+
+const COL_SPAN = 14;
 
 interface Props {
   holdings: ValuedHolding[];
@@ -13,6 +17,7 @@ interface Props {
 }
 
 export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   const sortedHoldings = [...holdings].sort(
     (a, b) => b.marketValue - a.marketValue
   );
@@ -29,7 +34,6 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
               <th className="px-5 py-3 font-medium">Ticker</th>
               <th className="px-3 py-3 font-medium">Price</th>
               <th className="px-3 py-3 font-medium text-right">P/E</th>
-              <th className="px-3 py-3 font-medium text-right">Div Y</th>
               <th className="px-3 py-3 font-medium text-right">Beta</th>
               <th className="px-3 py-3 font-medium text-right">Shares</th>
               <th className="px-3 py-3 font-medium text-right">Mkt Value</th>
@@ -37,10 +41,10 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
               <th className="px-3 py-3 font-medium text-right">DCF Fair</th>
               <th className="px-3 py-3 font-medium text-right">Analyst</th>
               <th className="px-3 py-3 font-medium text-right">MoS</th>
-              <th className="px-3 py-3 font-medium text-right">WACC</th>
               <th className="px-3 py-3 font-medium text-right">Weight</th>
               <th className="px-5 py-3 font-medium">Verdict</th>
               <th className="px-3 py-3 font-medium text-right">Model</th>
+              <th className="px-3 py-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
@@ -48,13 +52,14 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
               const mosTone = tone(h.dcf.marginOfSafety);
               const plTone = tone(h.unrealisedPL);
               const isSel = selectedTicker === h.dcf.ticker;
+              const isOpen = expanded === h.dcf.ticker;
               return (
+                <Fragment key={h.dcf.ticker}>
                 <tr
-                  key={h.dcf.ticker}
                   onClick={() => onSelect(h.dcf.ticker)}
                   className={cn(
                     "border-b border-line/60 hover:bg-bg-hover transition-colors cursor-pointer",
-                    isSel && "bg-bg-hover"
+                    (isSel || isOpen) && "bg-bg-hover"
                   )}
                 >
                   <td className="px-5 py-3.5">
@@ -84,12 +89,6 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                   <td className="px-3 py-3.5 text-right num text-ink-dim">
                     {h.dcf.snapshot.trailingPE
                       ? fmtNum(h.dcf.snapshot.trailingPE, 1)
-                      : "—"}
-                  </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
-                    {h.dcf.snapshot.dividendYield !== null &&
-                    h.dcf.snapshot.dividendYield !== undefined
-                      ? fmtPct(h.dcf.snapshot.dividendYield, 2)
                       : "—"}
                   </td>
                   <td className="px-3 py-3.5 text-right num text-ink-dim">
@@ -157,9 +156,6 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                   >
                     {fmtSignedPct(h.dcf.marginOfSafety)}
                   </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
-                    {fmtPct(h.dcf.wacc.wacc, 2)}
-                  </td>
                   <td className="px-3 py-3.5 text-right num">
                     <WeightCell
                       current={h.currentWeight}
@@ -180,12 +176,126 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                       <ExternalLink className="h-3 w-3" />
                     </Link>
                   </td>
+                  <td className="px-3 py-3.5 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpanded(isOpen ? null : h.dcf.ticker);
+                      }}
+                      title={isOpen ? "Hide details" : "Show 6-month chart & transactions"}
+                      aria-expanded={isOpen}
+                      className="inline-flex items-center justify-center h-6 w-6 rounded text-ink-fade hover:text-ink hover:bg-bg-elev transition"
+                    >
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          isOpen && "rotate-180"
+                        )}
+                      />
+                    </button>
+                  </td>
                 </tr>
+                {isOpen && (
+                  <tr className="border-b border-line/60 bg-bg-elev/30">
+                    <td colSpan={COL_SPAN} className="px-5 py-5">
+                      <HoldingDetail h={h} />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function HoldingDetail({ h }: { h: ValuedHolding }) {
+  const txns = h.holding.transactions ?? [];
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6">
+      <div className="card-elev p-4">
+        <MiniPriceChart ticker={h.dcf.ticker} months={6} />
+      </div>
+      <TransactionLedger txns={txns} avgCost={h.holding.avgCost} shares={h.holding.shares} />
+    </div>
+  );
+}
+
+function TransactionLedger({
+  txns,
+  avgCost,
+  shares,
+}: {
+  txns: Transaction[];
+  avgCost: number;
+  shares: number;
+}) {
+  const sorted = [...txns].sort((a, b) => a.date.localeCompare(b.date));
+  return (
+    <div className="card-elev overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line/60">
+        <span className="label-eyebrow">Transaction History</span>
+        <span className="text-[11px] text-ink-dim num">
+          {fmtNum(shares, 2)} sh · avg cost {fmtUSD(avgCost)}
+        </span>
+      </div>
+      {sorted.length === 0 ? (
+        <div className="px-4 py-6 text-[12px] text-ink-fade">
+          No recorded transactions for this position yet. Buys made via the
+          INVEST button are logged here automatically.
+        </div>
+      ) : (
+        <table className="w-full text-[12px]">
+          <thead>
+            <tr className="text-left text-ink-fade border-b border-line/60">
+              <th className="px-4 py-2 font-medium">Date</th>
+              <th className="px-4 py-2 font-medium">Action</th>
+              <th className="px-4 py-2 font-medium text-right">Shares</th>
+              <th className="px-4 py-2 font-medium text-right">Price</th>
+              <th className="px-4 py-2 font-medium text-right">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((t, i) => {
+              const isBuy = t.type === "BUY";
+              return (
+                <tr key={i} className="border-b border-line/40 last:border-0">
+                  <td className="px-4 py-2.5 num text-ink-dim">
+                    {new Date(t.date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide",
+                        isBuy ? "bg-pos/15 text-pos" : "bg-warn/15 text-warn"
+                      )}
+                    >
+                      {t.type}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-right num">
+                    {fmtNum(t.shares, 2)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right num">
+                    {fmtUSD(t.price)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right num text-ink-dim">
+                    {fmtUSD(t.shares * t.price)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }

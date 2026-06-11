@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, RefreshCw, Settings2 } from "lucide-react";
 import { PortfolioSummary } from "@/components/PortfolioSummary";
+import { PortfolioCharts } from "@/components/PortfolioCharts";
 import { ReturnsRibbon } from "@/components/ReturnsRibbon";
 import { HoldingsTable } from "@/components/HoldingsTable";
 import { AllocationPanel } from "@/components/AllocationPanel";
@@ -10,6 +11,7 @@ import { StockDetail } from "@/components/StockDetail";
 import { PortfolioEditor } from "@/components/PortfolioEditor";
 import { NewsFeed } from "@/components/NewsFeed";
 import { WatchlistTable } from "@/components/WatchlistTable";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { PortfolioValuation, AllocationRecommendation } from "@/lib/allocate";
 
 interface ApiResp {
@@ -56,7 +58,7 @@ export default function Page() {
   }, [cash, load]);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative z-10">
       <Header
         riskFree={data?.riskFreeRate ?? null}
         onRefresh={() => load(cash)}
@@ -98,6 +100,10 @@ export default function Page() {
         </section>
 
         {data && data.portfolio.holdings.length > 0 && <ReturnsRibbon />}
+
+        {data && data.portfolio.holdings.length > 0 && (
+          <PortfolioCharts p={data.portfolio} />
+        )}
 
         <section className="space-y-6">
           {data && (
@@ -245,7 +251,7 @@ function Header({
             <Activity className="h-4 w-4 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-semibold leading-tight">
+            <h1 className="text-base font-semibold leading-tight text-gradient">
               DCF Portfolio
             </h1>
             <p className="text-[11px] text-ink-fade">
@@ -279,6 +285,7 @@ function Header({
             <Settings2 className="h-3.5 w-3.5" />
             Holdings
           </button>
+          <ThemeToggle />
         </div>
       </div>
     </header>

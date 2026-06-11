@@ -613,6 +613,40 @@ export function valuateCompany(
       bullMarginEnd = clamp(ebitdaMarginStart + expansionRoom, ebitdaMarginStart, ebitdaMarginMax * 1.10);
       bearMarginStart = clamp(ebitdaMarginStart * 0.98, 0.02, 0.85);
       bearMarginEnd = clamp(ebitdaMarginStart * 0.95, 0.02, 0.85);
+    } else if (ebitdaMarginStart < ebitdaMarginMean * 0.92) {
+      // Cyclically DEPRESSED (not impaired): trailing margin sits materially
+      // below the company's OWN 5-yr mean — classic cyclical trough (autos in
+      // a price war, semis at the bottom of the cycle, energy at low spreads).
+      // These margins mean-revert; treating the trough as the permanent normal
+      // (the +100bps mature cap) structurally understates fair value. We glide
+      // back toward the historical mean. This is DISTINCT from "impaired",
+      // which implies permanent regulatory/structural scarring + left-skewed
+      // outcomes (and tilts scenario weights to the bear). A cyclical trough
+      // is symmetric — it recovers.
+      const recoveryGap = ebitdaMarginMean - ebitdaMarginStart;
+      // Base: recover 60% of the way back to the 5-yr mean.
+      baseMarginEnd = clamp(
+        ebitdaMarginStart + recoveryGap * 0.6,
+        ebitdaMarginStart,
+        ebitdaMarginMax
+      );
+      // Bull: full recovery to the mean, plus 30% of the way from mean→peak.
+      bullMarginStart = clamp(ebitdaMarginStart + 0.005, 0.03, 0.90);
+      bullMarginEnd = clamp(
+        ebitdaMarginMean + 0.3 * Math.max(0, ebitdaMarginMax - ebitdaMarginMean),
+        ebitdaMarginStart,
+        ebitdaMarginMax
+      );
+      // Bear: trough largely persists — only 20% recovery.
+      bearMarginStart = clamp(ebitdaMarginStart * 0.98, 0.02, 0.85);
+      bearMarginEnd = clamp(
+        ebitdaMarginStart + recoveryGap * 0.2,
+        0.02,
+        ebitdaMarginMean
+      );
+      notes.push(
+        `Cyclically depressed margins: trailing EBITDA margin ${(ebitdaMarginStart * 100).toFixed(1)}% sits below the 5-yr mean ${(ebitdaMarginMean * 100).toFixed(1)}% (peak ${(ebitdaMarginMax * 100).toFixed(1)}%). Treated as mean-reverting (not impaired): base recovers ~60% of the gap to the mean, bull recovers fully + partway to peak, bear stays near the trough.`
+      );
     } else {
       baseMarginEnd = clamp(ebitdaMarginStart + 0.01, 0.03, ebitdaMarginMax);
       bullMarginStart = clamp(ebitdaMarginStart + 0.005, 0.03, 0.90);
@@ -700,16 +734,37 @@ export function valuateCompany(
   // something real: either the market is pricing optionality DCF can't see
   // (TSLA's robotaxi/Optimus narrative), or there's a legitimate contrarian
   // call worth thinking about.
+  // ── Consensus anchoring band ───────────────────────────────────────────────
+  // The published fair value is kept within ±ANCHOR_BAND of analyst consensus
+  // when there is meaningful sell-side coverage. The raw probability-weighted
+  // DCF (rawDcfFair) is preserved for full transparency, but the headline
+  // fairValue can't run away from the Street: names already within the band
+  // (most mature holdings) are untouched, while high-growth outliers whose raw
+  // DCF balloons far above consensus (or cyclical names that crater far below)
+  // are reeled back to the band edge. This keeps every fair value "reasonable"
+  // and close to consensus, as requested, while still surfacing the raw gap.
+  const ANCHOR_BAND = 0.20;
+  const MIN_ANALYSTS = 3;
   const consensus = snapshot.analystTargetMean;
-  const fairValue = rawDcfFair;
+  let fairValue = rawDcfFair;
   let consensusGap: number | null = null;
   let consensusFlag: "OK" | "WARN" | "ALERT" | null = null;
   let consensusDiagnosis: string | null = null;
+  let anchored = false;
 
   if (consensus && consensus > 0) {
     consensusGap = rawDcfFair / consensus - 1;
     const a = Math.abs(consensusGap);
-    if (a <= 0.20) {
+    const haveCoverage =
+      (snapshot.numberOfAnalysts ?? 0) >= MIN_ANALYSTS;
+
+    if (haveCoverage && a > ANCHOR_BAND) {
+      const clampedGap = clamp(consensusGap, -ANCHOR_BAND, ANCHOR_BAND);
+      fairValue = consensus * (1 + clampedGap);
+      anchored = true;
+    }
+
+    if (a <= ANCHOR_BAND) {
       consensusFlag = "OK";
     } else if (a <= 0.40) {
       consensusFlag = "WARN";
@@ -717,7 +772,7 @@ export function valuateCompany(
         consensusGap, snapshot, wacc, ebitdaMarginStart, baseY1, nwcPctRev
       );
       notes.push(
-        `Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap, WARN). ${consensusDiagnosis}`
+        `Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap, WARN).${anchored ? ` Fair value anchored to $${fairValue.toFixed(0)} (within ±${(ANCHOR_BAND * 100).toFixed(0)}% of consensus).` : ""} ${consensusDiagnosis}`
       );
     } else {
       consensusFlag = "ALERT";
@@ -725,11 +780,13 @@ export function valuateCompany(
         consensusGap, snapshot, wacc, ebitdaMarginStart, baseY1, nwcPctRev
       );
       notes.push(
-        `⚠ ALERT: Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap). ${consensusDiagnosis}`
+        `⚠ ALERT: Raw DCF $${rawDcfFair.toFixed(0)} vs analyst $${consensus.toFixed(0)} (${(consensusGap * 100).toFixed(0)}% gap).${anchored ? ` Fair value anchored to $${fairValue.toFixed(0)} (within ±${(ANCHOR_BAND * 100).toFixed(0)}% of consensus).` : ""} ${consensusDiagnosis}`
       );
     }
   }
-  const consensusGapAnchored = consensusGap; // Deprecated; kept for API back-compat
+  // Gap of the *published* (anchored) fair value vs consensus.
+  const consensusGapAnchored =
+    consensus && consensus > 0 ? fairValue / consensus - 1 : null;
 
   const price = snapshot.price;
   const marginOfSafety = price > 0 ? (fairValue - price) / price : 0;
