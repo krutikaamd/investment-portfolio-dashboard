@@ -518,6 +518,91 @@ export async function getPortfolioNews(
   return ranked.slice(0, topN);
 }
 
+/* ───────────────────────── Earnings & calendar ───────────────────────── */
+
+export interface EarningsInfo {
+  ticker: string;
+  longName: string;
+  earningsDate: string | null; // ISO date (next scheduled/estimated report)
+  isEstimate: boolean;         // true when Yahoo returns a date *range* (not confirmed)
+  epsEstimate: number | null;
+  exDividendDate: string | null;
+  dividendDate: string | null;
+}
+
+function isoFromYahooDate(d: unknown): string | null {
+  if (d instanceof Date) return d.toISOString().slice(0, 10);
+  if (typeof d === "number" && isFinite(d)) {
+    // Yahoo epoch seconds.
+    return new Date(d * 1000).toISOString().slice(0, 10);
+  }
+  if (typeof d === "string") {
+    const t = Date.parse(d);
+    return isFinite(t) ? new Date(t).toISOString().slice(0, 10) : null;
+  }
+  if (typeof d === "object" && d !== null) {
+    const raw = (d as { raw?: number }).raw;
+    if (typeof raw === "number" && isFinite(raw)) {
+      return new Date(raw * 1000).toISOString().slice(0, 10);
+    }
+    const fmt = (d as { fmt?: string }).fmt;
+    if (typeof fmt === "string") {
+      const t = Date.parse(fmt);
+      return isFinite(t) ? new Date(t).toISOString().slice(0, 10) : fmt;
+    }
+  }
+  return null;
+}
+
+const earningsCache = new Map<string, { t: number; data: EarningsInfo }>();
+const EARNINGS_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+
+export async function getEarningsInfo(ticker: string): Promise<EarningsInfo> {
+  const key = ticker.toUpperCase();
+  const now = Date.now();
+  const hit = earningsCache.get(key);
+  if (hit && now - hit.t < EARNINGS_TTL_MS) return hit.data;
+
+  let summary: Record<string, unknown> = {};
+  try {
+    summary = (await yf.quoteSummary(key, {
+      modules: ["calendarEvents", "price"],
+    })) as Record<string, unknown>;
+  } catch {
+    summary = {};
+  }
+
+  const cal = (summary.calendarEvents as Record<string, unknown>) ?? {};
+  const pr = (summary.price as Record<string, unknown>) ?? {};
+  const earnings = (cal.earnings as Record<string, unknown>) ?? {};
+  const datesRaw = earnings.earningsDate;
+
+  let earningsDate: string | null = null;
+  let isEstimate = false;
+  if (Array.isArray(datesRaw) && datesRaw.length > 0) {
+    earningsDate = isoFromYahooDate(datesRaw[0]);
+    isEstimate = datesRaw.length > 1;
+  } else if (datesRaw) {
+    earningsDate = isoFromYahooDate(datesRaw);
+  }
+
+  const data: EarningsInfo = {
+    ticker: key,
+    longName:
+      (pr.longName as string | undefined) ??
+      (pr.shortName as string | undefined) ??
+      key,
+    earningsDate,
+    isEstimate,
+    epsEstimate: num(earnings.earningsAverage),
+    exDividendDate: isoFromYahooDate(cal.exDividendDate),
+    dividendDate: isoFromYahooDate(cal.dividendDate),
+  };
+
+  earningsCache.set(key, { t: now, data });
+  return data;
+}
+
 /* ───────────────────────── Historical prices ───────────────────────── */
 
 export interface PriceBar {

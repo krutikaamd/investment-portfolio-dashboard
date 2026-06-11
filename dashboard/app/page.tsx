@@ -12,6 +12,9 @@ import { PortfolioEditor } from "@/components/PortfolioEditor";
 import { NewsFeed } from "@/components/NewsFeed";
 import { WatchlistTable } from "@/components/WatchlistTable";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { EarningsCalendar } from "@/components/EarningsCalendar";
+import { ExportMenu } from "@/components/ExportMenu";
+import { PrintReport } from "@/components/PrintReport";
 import type { PortfolioValuation, AllocationRecommendation } from "@/lib/allocate";
 
 interface ApiResp {
@@ -58,15 +61,17 @@ export default function Page() {
   }, [cash, load]);
 
   return (
-    <div className="min-h-screen relative z-10">
+    <>
+    <div className="min-h-screen relative z-10 screen-root">
       <Header
         riskFree={data?.riskFreeRate ?? null}
         onRefresh={() => load(cash)}
         onEdit={() => setEditorOpen(true)}
         loading={loading}
+        portfolio={data?.portfolio ?? null}
       />
 
-      <main className="max-w-[1440px] mx-auto px-6 pt-6 pb-20 space-y-8">
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 pt-6 pb-20 space-y-8">
         {error && (
           <div className="rounded-xl border border-neg/40 bg-neg/10 p-4 text-sm text-neg">
             {error}
@@ -103,6 +108,10 @@ export default function Page() {
 
         {data && data.portfolio.holdings.length > 0 && (
           <PortfolioCharts p={data.portfolio} />
+        )}
+
+        {data && data.portfolio.holdings.length > 0 && (
+          <EarningsCalendar onSelectTicker={setSelectedTicker} />
         )}
 
         <section className="space-y-6">
@@ -160,6 +169,8 @@ export default function Page() {
         onSaved={() => load(cash)}
       />
     </div>
+    <PrintReport p={data?.portfolio ?? null} />
+    </>
   );
 }
 
@@ -237,15 +248,17 @@ function Header({
   onRefresh,
   onEdit,
   loading,
+  portfolio,
 }: {
   riskFree: number | null;
   onRefresh: () => void;
   onEdit: () => void;
   loading: boolean;
+  portfolio: PortfolioValuation | null;
 }) {
   return (
-    <header className="border-b border-line/60 bg-bg-elev/40 backdrop-blur-sm sticky top-0 z-30">
-      <div className="max-w-[1440px] mx-auto px-6 py-4 flex items-center justify-between">
+    <header className="border-b border-line/60 bg-bg-elev/40 backdrop-blur-sm sticky top-0 z-30 print:hidden">
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-accent to-cyan flex items-center justify-center shadow-glow">
             <Activity className="h-4 w-4 text-white" />
@@ -259,7 +272,7 @@ function Header({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {riskFree !== null && (
             <div className="hidden md:flex flex-col text-right">
               <span className="text-[10px] uppercase tracking-wider text-ink-fade">
@@ -276,15 +289,16 @@ function Header({
             className="inline-flex items-center gap-2 rounded-lg border border-line bg-bg-elev px-3 py-2 text-xs font-medium text-ink-dim hover:text-ink hover:border-line-strong disabled:opacity-50 transition"
           >
             <RefreshCw className={"h-3.5 w-3.5 " + (loading ? "animate-spin" : "")} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
             onClick={onEdit}
             className="inline-flex items-center gap-2 rounded-lg border border-line bg-bg-elev px-3 py-2 text-xs font-medium text-ink-dim hover:text-ink hover:border-line-strong transition"
           >
             <Settings2 className="h-3.5 w-3.5" />
-            Holdings
+            <span className="hidden sm:inline">Holdings</span>
           </button>
+          <ExportMenu portfolio={portfolio} />
           <ThemeToggle />
         </div>
       </div>

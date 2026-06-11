@@ -33,17 +33,17 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
             <tr className="text-left text-ink-fade label-eyebrow border-b border-line">
               <th className="px-5 py-3 font-medium">Ticker</th>
               <th className="px-3 py-3 font-medium">Price</th>
-              <th className="px-3 py-3 font-medium text-right">P/E</th>
-              <th className="px-3 py-3 font-medium text-right">Beta</th>
-              <th className="px-3 py-3 font-medium text-right">Shares</th>
-              <th className="px-3 py-3 font-medium text-right">Mkt Value</th>
+              <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">P/E</th>
+              <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">Beta</th>
+              <th className="px-3 py-3 font-medium text-right hidden md:table-cell">Shares</th>
+              <th className="px-3 py-3 font-medium text-right hidden sm:table-cell">Mkt Value</th>
               <th className="px-3 py-3 font-medium text-right">P/L</th>
               <th className="px-3 py-3 font-medium text-right">DCF Fair</th>
-              <th className="px-3 py-3 font-medium text-right">Analyst</th>
+              <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">Analyst</th>
               <th className="px-3 py-3 font-medium text-right">MoS</th>
-              <th className="px-3 py-3 font-medium text-right">Weight</th>
-              <th className="px-5 py-3 font-medium">Verdict</th>
-              <th className="px-3 py-3 font-medium text-right">Model</th>
+              <th className="px-3 py-3 font-medium text-right hidden md:table-cell">Weight</th>
+              <th className="px-5 py-3 font-medium hidden sm:table-cell">Verdict</th>
+              <th className="px-3 py-3 font-medium text-right hidden sm:table-cell">Model</th>
               <th className="px-3 py-3 font-medium"></th>
             </tr>
           </thead>
@@ -86,21 +86,21 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                   <td className="px-3 py-3.5 num">
                     {fmtUSD(h.dcf.snapshot.price)}
                   </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
+                  <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                     {h.dcf.snapshot.trailingPE
                       ? fmtNum(h.dcf.snapshot.trailingPE, 1)
                       : "—"}
                   </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
+                  <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                     {h.dcf.snapshot.beta !== null &&
                     h.dcf.snapshot.beta !== undefined
                       ? fmtNum(h.dcf.snapshot.beta, 2)
                       : "—"}
                   </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
+                  <td className="px-3 py-3.5 text-right num text-ink-dim hidden md:table-cell">
                     {fmtNum(h.holding.shares, 0)}
                   </td>
-                  <td className="px-3 py-3.5 text-right num font-medium">
+                  <td className="px-3 py-3.5 text-right num font-medium hidden sm:table-cell">
                     {fmtUSD(h.marketValue)}
                   </td>
                   <td
@@ -142,7 +142,7 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                       <span>{fmtUSD(h.dcf.fairValue)}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-3.5 text-right num text-ink-dim">
+                  <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                     {h.dcf.snapshot.analystTargetMean
                       ? fmtUSD(h.dcf.snapshot.analystTargetMean)
                       : "—"}
@@ -156,16 +156,16 @@ export function HoldingsTable({ holdings, onSelect, selectedTicker }: Props) {
                   >
                     {fmtSignedPct(h.dcf.marginOfSafety)}
                   </td>
-                  <td className="px-3 py-3.5 text-right num">
+                  <td className="px-3 py-3.5 text-right num hidden md:table-cell">
                     <WeightCell
                       current={h.currentWeight}
                       target={h.fairWeight}
                     />
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 hidden sm:table-cell">
                     <VerdictBadge verdict={h.dcf.verdict} />
                   </td>
-                  <td className="px-3 py-3.5 text-right">
+                  <td className="px-3 py-3.5 text-right hidden sm:table-cell">
                     <Link
                       href={`/stock/${encodeURIComponent(h.dcf.ticker)}`}
                       onClick={(e) => e.stopPropagation()}

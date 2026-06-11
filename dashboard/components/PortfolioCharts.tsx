@@ -87,8 +87,18 @@ const RANGES: { label: string; months: number }[] = [
   { label: "1Y", months: 12 },
 ];
 
+const BENCHMARK_OPTIONS: { value: string; label: string }[] = [
+  { value: "^GSPC", label: "S&P 500" },
+  { value: "QQQ", label: "Nasdaq 100" },
+  { value: "^DJI", label: "Dow Jones" },
+  { value: "XLK", label: "Tech (XLK)" },
+  { value: "SOXX", label: "Semis (SOXX)" },
+  { value: "IWM", label: "Russell 2000" },
+];
+
 function PerformanceChart() {
   const [months, setMonths] = useState(6);
+  const [benchmark, setBenchmark] = useState("^GSPC");
   const [data, setData] = useState<PerfResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -97,9 +107,12 @@ function PerformanceChart() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/performance?months=${months}&t=${Date.now()}`, {
-      cache: "no-store",
-    })
+    fetch(
+      `/api/performance?months=${months}&benchmark=${encodeURIComponent(
+        benchmark
+      )}&t=${Date.now()}`,
+      { cache: "no-store" }
+    )
       .then(async (r) => {
         const j = (await r.json()) as PerfResponse;
         if (!r.ok) throw new Error(j.error ?? `Failed (${r.status})`);
@@ -117,22 +130,38 @@ function PerformanceChart() {
     return () => {
       cancelled = true;
     };
-  }, [months]);
+  }, [months, benchmark]);
 
   const pReturn = data?.portfolioReturnPct ?? null;
   const bReturn = data?.benchmarkReturnPct ?? null;
   const beat = pReturn !== null && bReturn !== null && pReturn >= bReturn;
+  const benchLabel =
+    data?.benchmarkLabel ??
+    BENCHMARK_OPTIONS.find((b) => b.value === benchmark)?.label ??
+    "Benchmark";
 
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <span className="label-eyebrow">Performance vs S&amp;P 500</span>
+          <span className="label-eyebrow">Performance vs {benchLabel}</span>
           <p className="text-[11px] text-ink-fade mt-0.5">
             Look-through basket, rebased to 100 at window start
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <select
+            value={benchmark}
+            onChange={(e) => setBenchmark(e.target.value)}
+            aria-label="Benchmark"
+            className="rounded-md border border-line bg-bg-elev px-2 py-1 text-[11px] font-semibold text-ink-dim hover:text-ink hover:border-line-strong focus:outline-none focus:border-accent/40 transition cursor-pointer"
+          >
+            {BENCHMARK_OPTIONS.map((b) => (
+              <option key={b.value} value={b.value}>
+                {b.label}
+              </option>
+            ))}
+          </select>
           {RANGES.map((r) => (
             <button
               key={r.label}
@@ -159,7 +188,7 @@ function PerformanceChart() {
           />
           <LegendStat
             color={BENCH}
-            label="S&P 500"
+            label={benchLabel}
             value={bReturn !== null ? fmtSignedPct(bReturn) : "—"}
           />
           {pReturn !== null && bReturn !== null && (
@@ -234,7 +263,7 @@ function PerformanceChart() {
                 strokeWidth={2}
                 strokeDasharray="5 3"
                 dot={false}
-                name="S&P 500"
+                name={benchLabel}
               />
             </ComposedChart>
           </ResponsiveContainer>

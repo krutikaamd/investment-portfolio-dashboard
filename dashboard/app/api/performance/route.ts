@@ -6,7 +6,15 @@ import { computePerformanceSeries } from "@/lib/performance";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BENCHMARK = "^GSPC"; // S&P 500
+const BENCHMARKS: Record<string, { symbol: string; label: string }> = {
+  "^GSPC": { symbol: "^GSPC", label: "S&P 500" },
+  QQQ: { symbol: "QQQ", label: "Nasdaq 100" },
+  "^DJI": { symbol: "^DJI", label: "Dow Jones" },
+  XLK: { symbol: "XLK", label: "Tech (XLK)" },
+  SOXX: { symbol: "SOXX", label: "Semis (SOXX)" },
+  IWM: { symbol: "IWM", label: "Russell 2000" },
+};
+const DEFAULT_BENCHMARK = "^GSPC";
 
 export async function GET(req: Request) {
   try {
@@ -15,6 +23,8 @@ export async function GET(req: Request) {
       Math.max(Number(searchParams.get("months") ?? 6), 1),
       60
     );
+    const benchKey = (searchParams.get("benchmark") ?? DEFAULT_BENCHMARK).toUpperCase();
+    const bench = BENCHMARKS[benchKey] ?? BENCHMARKS[DEFAULT_BENCHMARK];
 
     const portfolio = await loadPortfolio();
     const tickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
@@ -27,7 +37,7 @@ export async function GET(req: Request) {
         endValue: 0,
         portfolioReturnPct: null,
         benchmarkReturnPct: null,
-        benchmarkLabel: "S&P 500",
+        benchmarkLabel: bench.label,
         coverage: 0,
       });
     }
@@ -46,7 +56,7 @@ export async function GET(req: Request) {
           async (t) => [t, await getHistoricalCloses(t, fetchFrom)] as const
         )
       ),
-      getHistoricalCloses(BENCHMARK, fetchFrom),
+      getHistoricalCloses(bench.symbol, fetchFrom),
     ]);
 
     const histories = new Map(tickerHistories);
@@ -55,7 +65,7 @@ export async function GET(req: Request) {
       histories,
       benchmarkHistory,
       fromIso,
-      "S&P 500"
+      bench.label
     );
 
     return NextResponse.json(result, {

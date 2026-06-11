@@ -170,14 +170,14 @@ export function WatchlistTable({ onSelectTicker }: Props) {
               <tr className="text-left text-ink-fade label-eyebrow border-b border-line">
                 <th className="px-5 py-3 font-medium">Ticker</th>
                 <th className="px-3 py-3 font-medium">Price</th>
-                <th className="px-3 py-3 font-medium text-right">Since Added</th>
+                <th className="px-3 py-3 font-medium text-right hidden md:table-cell">Since Added</th>
                 <th className="px-3 py-3 font-medium text-right">DCF Fair</th>
-                <th className="px-3 py-3 font-medium text-right">Analyst</th>
+                <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">Analyst</th>
                 <th className="px-3 py-3 font-medium text-right">MoS</th>
-                <th className="px-3 py-3 font-medium text-right">P/E</th>
-                <th className="px-3 py-3 font-medium text-right">Div Y</th>
-                <th className="px-5 py-3 font-medium">Verdict</th>
-                <th className="px-3 py-3 font-medium text-right">Model</th>
+                <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">P/E</th>
+                <th className="px-3 py-3 font-medium text-right hidden lg:table-cell">Div Y</th>
+                <th className="px-5 py-3 font-medium hidden sm:table-cell">Verdict</th>
+                <th className="px-3 py-3 font-medium text-right hidden sm:table-cell">Model</th>
                 <th className="px-3 py-3 font-medium"></th>
                 <th className="px-3 py-3 font-medium"></th>
               </tr>
@@ -222,7 +222,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                     </td>
                     <td
                       className={cn(
-                        "px-3 py-3.5 text-right num",
+                        "px-3 py-3.5 text-right num hidden md:table-cell",
                         perfTone === "pos" && "text-pos",
                         perfTone === "neg" && "text-neg"
                       )}
@@ -253,7 +253,7 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                         <span>{fmtUSD(w.dcf.fairValue)}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-3.5 text-right num text-ink-dim">
+                    <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                       {w.dcf.snapshot.analystTargetMean
                         ? fmtUSD(w.dcf.snapshot.analystTargetMean)
                         : "—"}
@@ -267,21 +267,21 @@ export function WatchlistTable({ onSelectTicker }: Props) {
                     >
                       {fmtSignedPct(w.dcf.marginOfSafety)}
                     </td>
-                    <td className="px-3 py-3.5 text-right num text-ink-dim">
+                    <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                       {w.dcf.snapshot.trailingPE
                         ? w.dcf.snapshot.trailingPE.toFixed(1)
                         : "—"}
                     </td>
-                    <td className="px-3 py-3.5 text-right num text-ink-dim">
+                    <td className="px-3 py-3.5 text-right num text-ink-dim hidden lg:table-cell">
                       {w.dcf.snapshot.dividendYield !== null &&
                       w.dcf.snapshot.dividendYield !== undefined
                         ? fmtPct(w.dcf.snapshot.dividendYield, 2)
                         : "—"}
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-5 py-3.5 hidden sm:table-cell">
                       <VerdictBadge verdict={w.dcf.verdict} />
                     </td>
-                    <td className="px-3 py-3.5 text-right">
+                    <td className="px-3 py-3.5 text-right hidden sm:table-cell">
                       <Link
                         href={`/stock/${encodeURIComponent(w.ticker)}`}
                         onClick={(e) => e.stopPropagation()}
