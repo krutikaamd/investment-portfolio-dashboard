@@ -52,7 +52,7 @@ export function AllocationPanel({
     <div className="card overflow-hidden">
       <div className="relative overflow-hidden border-b border-line bg-gradient-to-br from-accent/20 via-bg-card to-bg-card">
         <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-accent/30 blur-3xl pointer-events-none" />
-        <div className="relative p-6 space-y-5">
+        <div className="relative p-4 sm:p-6 space-y-5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-accent-glow" />
             <span className="label-eyebrow text-accent-glow">
@@ -79,7 +79,7 @@ export function AllocationPanel({
                     commit(isFinite(n) && n >= 0 ? n : 0);
                   }
                 }}
-                className="w-full rounded-xl border border-line bg-bg-elev pl-10 pr-4 py-4 text-3xl font-semibold tracking-tight text-ink num focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition"
+                className="w-full rounded-xl border border-line bg-bg-elev pl-10 pr-4 py-3.5 sm:py-4 text-2xl sm:text-3xl font-semibold tracking-tight text-ink num focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 transition"
                 placeholder="5,000"
               />
             </div>
@@ -201,8 +201,8 @@ function RecommendationRow({
   }
 
   return (
-    <div className="px-6 py-4 flex items-center gap-4 hover:bg-bg-hover transition">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-bg-elev">
+    <div className="px-4 sm:px-6 py-4 flex flex-wrap items-start gap-x-3 gap-y-3 sm:items-center sm:gap-4 hover:bg-bg-hover transition">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-bg-elev">
         {isBuy && <ArrowUpRight className="h-4 w-4 text-pos" />}
         {isTrim && <ArrowDownRight className="h-4 w-4 text-warn" />}
         {!isBuy && !isTrim && <Minus className="h-4 w-4 text-ink-fade" />}
@@ -231,50 +231,56 @@ function RecommendationRow({
             MoS {fmtSignedPct(r.marginOfSafety)}
           </span>
         </div>
-        <div className="text-[12px] text-ink-dim mt-1 truncate">{r.reason}</div>
+        <div className="text-[12px] text-ink-dim mt-1 line-clamp-2 sm:truncate">
+          {r.reason}
+        </div>
         {state.kind === "error" && (
           <div className="text-[11px] text-neg mt-1">⚠ {state.msg}</div>
         )}
       </div>
-      <div className="text-right">
-        <div className="num font-semibold">
-          {r.dollarsToAdd > 0 ? `+${fmtUSD(r.dollarsToAdd)}` : "—"}
+      {/* Amounts + Invest button: full-width second line on mobile, inline on
+          desktop. Indented to align under the text column on mobile. */}
+      <div className="flex w-full items-center justify-between gap-3 pl-12 sm:w-auto sm:justify-end sm:pl-0">
+        <div className="text-left sm:text-right">
+          <div className="num font-semibold">
+            {r.dollarsToAdd > 0 ? `+${fmtUSD(r.dollarsToAdd)}` : "—"}
+          </div>
+          <div className="text-[11px] text-ink-dim num">
+            {r.sharesToAdd > 0
+              ? `${fmtNum(r.sharesToAdd, r.sharesToAdd < 1 ? 4 : 2)} shares @ ${fmtUSD(pricePerShare)}`
+              : ""}
+          </div>
         </div>
-        <div className="text-[11px] text-ink-dim num">
-          {r.sharesToAdd > 0
-            ? `${fmtNum(r.sharesToAdd, r.sharesToAdd < 1 ? 4 : 2)} shares @ ${fmtUSD(pricePerShare)}`
-            : ""}
-        </div>
-      </div>
-      {canInvest && (
-        <button
-          onClick={invest}
-          disabled={state.kind === "loading" || state.kind === "done"}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider ring-1 transition shrink-0",
-            state.kind === "done"
-              ? "bg-pos/20 text-pos ring-pos/50 cursor-default"
+        {canInvest && (
+          <button
+            onClick={invest}
+            disabled={state.kind === "loading" || state.kind === "done"}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wider ring-1 transition shrink-0",
+              state.kind === "done"
+                ? "bg-pos/20 text-pos ring-pos/50 cursor-default"
+                : state.kind === "loading"
+                  ? "bg-accent/15 text-accent-glow ring-accent/40 cursor-wait"
+                  : "bg-accent text-white ring-accent/60 hover:bg-accent/90 shadow-glow"
+            )}
+            title={
+              state.kind === "done"
+                ? "Already invested"
+                : `Invest ${fmtUSD(r.dollarsToAdd)} into ${r.ticker}`
+            }
+          >
+            {state.kind === "loading" && (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            )}
+            {state.kind === "done" && <Check className="h-3.5 w-3.5" />}
+            {state.kind === "done"
+              ? "Invested"
               : state.kind === "loading"
-                ? "bg-accent/15 text-accent-glow ring-accent/40 cursor-wait"
-                : "bg-accent text-white ring-accent/60 hover:bg-accent/90 shadow-glow"
-          )}
-          title={
-            state.kind === "done"
-              ? "Already invested"
-              : `Invest ${fmtUSD(r.dollarsToAdd)} into ${r.ticker}`
-          }
-        >
-          {state.kind === "loading" && (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          )}
-          {state.kind === "done" && <Check className="h-3.5 w-3.5" />}
-          {state.kind === "done"
-            ? "Invested"
-            : state.kind === "loading"
-              ? "Investing…"
-              : "Invest"}
-        </button>
-      )}
+                ? "Investing…"
+                : "Invest"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
