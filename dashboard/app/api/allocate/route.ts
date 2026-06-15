@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getCompanyData, getRiskFreeRate } from "@/lib/yahoo";
 import { valuateCompany } from "@/lib/dcf";
 import { allocate, valuePortfolio, type Holding } from "@/lib/allocate";
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
   const cash = Number(searchParams.get("cash") ?? 0);
 
   try {
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const rf = await getRiskFreeRate();
 
     // Build the set of real holding tickers + the watchlist set.

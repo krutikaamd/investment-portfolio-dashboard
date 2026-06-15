@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio, savePortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import type { Holding } from "@/lib/allocate";
 
 export const runtime = "nodejs";
@@ -46,7 +47,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const portfolio = await loadPortfolio();
+  const userId = getUserId();
+  const portfolio = await loadPortfolio(userId);
   const idx = portfolio.holdings.findIndex(
     (h) => h.ticker.toUpperCase() === ticker
   );
@@ -84,7 +86,7 @@ export async function POST(req: Request) {
     portfolio.holdings.push(updatedHolding);
   }
 
-  await savePortfolio(portfolio);
+  await savePortfolio(userId, portfolio);
 
   return NextResponse.json({
     ok: true,

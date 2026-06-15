@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getCompanyNews, getPortfolioNews } from "@/lib/yahoo";
 
 export const runtime = "nodejs";
@@ -27,7 +28,7 @@ export async function GET(req: Request) {
         { headers: { "Cache-Control": "no-store, max-age=0" } }
       );
     }
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const tickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
     const news = await getPortfolioNews(tickers, perTicker, topN);
     return NextResponse.json(

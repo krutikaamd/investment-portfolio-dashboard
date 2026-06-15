@@ -4,6 +4,7 @@ import {
   savePortfolio,
   type WatchlistItem,
 } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getCompanyData, getRiskFreeRate } from "@/lib/yahoo";
 import { valuateCompany, type DcfResult } from "@/lib/dcf";
 
@@ -47,7 +48,7 @@ async function valueWatchlist(
 
 export async function GET() {
   try {
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const valued = await valueWatchlist(portfolio.watchlist);
     return NextResponse.json(
       { items: valued },
@@ -72,7 +73,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const portfolio = await loadPortfolio();
+    const userId = getUserId();
+    const portfolio = await loadPortfolio(userId);
     if (portfolio.watchlist.some((w) => w.ticker.toUpperCase() === tickerRaw)) {
       return NextResponse.json(
         { error: `${tickerRaw} is already on the watchlist` },
@@ -106,7 +108,7 @@ export async function POST(req: Request) {
       ...(body.note ? { note: body.note } : {}),
     };
     portfolio.watchlist.push(item);
-    await savePortfolio(portfolio);
+    await savePortfolio(userId, portfolio);
     return NextResponse.json({ added: item });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -127,7 +129,8 @@ export async function DELETE(req: Request) {
         { status: 400 }
       );
     }
-    const portfolio = await loadPortfolio();
+    const userId = getUserId();
+    const portfolio = await loadPortfolio(userId);
     const before = portfolio.watchlist.length;
     portfolio.watchlist = portfolio.watchlist.filter(
       (w) => w.ticker.toUpperCase() !== ticker
@@ -138,7 +141,7 @@ export async function DELETE(req: Request) {
         { status: 404 }
       );
     }
-    await savePortfolio(portfolio);
+    await savePortfolio(userId, portfolio);
     return NextResponse.json({ removed: ticker });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

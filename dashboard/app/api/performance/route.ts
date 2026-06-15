@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getHistoricalCloses } from "@/lib/yahoo";
 import { computePerformanceSeries } from "@/lib/performance";
 
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
     const benchKey = (searchParams.get("benchmark") ?? DEFAULT_BENCHMARK).toUpperCase();
     const bench = BENCHMARKS[benchKey] ?? BENCHMARKS[DEFAULT_BENCHMARK];
 
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const tickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
     if (tickers.length === 0) {
       return NextResponse.json({

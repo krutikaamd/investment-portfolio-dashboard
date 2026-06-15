@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getEarningsInfo } from "@/lib/yahoo";
 
 export const runtime = "nodejs";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const holdingTickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
     const watchTickers = portfolio.watchlist.map((w) => w.ticker.toUpperCase());
     const holdingSet = new Set(holdingTickers);

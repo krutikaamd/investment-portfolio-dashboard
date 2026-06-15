@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio, savePortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import type { Holding } from "@/lib/allocate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const p = await loadPortfolio();
+  const p = await loadPortfolio(getUserId());
   return NextResponse.json(p);
 }
 
@@ -35,8 +36,9 @@ export async function PUT(req: Request) {
     }))
     .filter((h) => h.ticker && h.shares > 0);
 
-  const existing = await loadPortfolio();
-  await savePortfolio({
+  const userId = getUserId();
+  const existing = await loadPortfolio(userId);
+  await savePortfolio(userId, {
     baseCurrency: "USD",
     holdings: cleaned,
     watchlist: existing.watchlist,

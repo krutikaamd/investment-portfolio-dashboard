@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadPortfolio } from "@/lib/portfolio-store";
+import { getUserId } from "@/lib/user";
 import { getHistoricalCloses } from "@/lib/yahoo";
 import { computeReturns } from "@/lib/returns";
 
@@ -10,7 +11,7 @@ const BENCHMARK = "^GSPC"; // S&P 500
 
 export async function GET() {
   try {
-    const portfolio = await loadPortfolio();
+    const portfolio = await loadPortfolio(getUserId());
     const tickers = portfolio.holdings.map((h) => h.ticker.toUpperCase());
     if (tickers.length === 0) {
       return NextResponse.json({

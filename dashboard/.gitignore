@@ -3,3 +3,7 @@ node_modules
 .env*.local
 .DS_Store
 *.log
+
+# Per-user portfolios written at runtime (dev file backend). The bundled
+# data/portfolio.json seed template is still tracked.
+data/portfolios/

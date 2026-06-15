@@ -37,8 +37,20 @@ class PortfolioStoreConfigError extends Error {
   }
 }
 
+// `FILE` is the bundled demo portfolio — used ONLY as the seed template for
+// brand-new users. Per-user state lives under `data/portfolios/{id}.json`
+// (dev) or `portfolio:user:{id}:v1` in Redis (prod).
 const FILE = path.join(process.cwd(), "data", "portfolio.json");
-const KV_KEY = "portfolio:state:v1";
+const PORTFOLIO_DIR = path.join(process.cwd(), "data", "portfolios");
+const KV_PREFIX = "portfolio:user:";
+const KV_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year; refreshed on access
+
+function userKey(userId: string): string {
+  return `${KV_PREFIX}${userId}:v1`;
+}
+function userFile(userId: string): string {
+  return path.join(PORTFOLIO_DIR, `${userId}.json`);
+}
 
 let redis: Redis | null = null;
 function getRedis(): Redis {
@@ -65,11 +77,23 @@ async function readBundledSeed(): Promise<PortfolioFile> {
   }
 }
 
-async function loadFromFile(): Promise<PortfolioFile> {
-  return readBundledSeed();
+async function loadFromFile(userId: string): Promise<PortfolioFile> {
+  try {
+    const raw = await fs.readFile(userFile(userId), "utf8");
+    return normalise(JSON.parse(raw) as Partial<PortfolioFile>);
+  } catch {
+    // New user — seed from the bundled demo portfolio and persist their copy.
+    const seed = await readBundledSeed();
+    try {
+      await saveToFile(userId, seed);
+    } catch {
+      /* best-effort seed; return it regardless */
+    }
+    return seed;
+  }
 }
 
-async function saveToFile(p: PortfolioFile): Promise<void> {
+async function saveToFile(userId: string, p: PortfolioFile): Promise<void> {
   if (IS_SERVERLESS) {
     throw new PortfolioStoreConfigError(
       "Cannot persist data: running on a read-only serverless filesystem " +
@@ -79,33 +103,39 @@ async function saveToFile(p: PortfolioFile): Promise<void> {
         "injected, then trigger a redeploy. See VERCEL_DEPLOY.md for details."
     );
   }
-  await fs.writeFile(FILE, JSON.stringify(p, null, 2), "utf8");
+  await fs.mkdir(PORTFOLIO_DIR, { recursive: true });
+  await fs.writeFile(userFile(userId), JSON.stringify(p, null, 2), "utf8");
 }
 
-async function loadFromRedis(): Promise<PortfolioFile> {
+async function loadFromRedis(userId: string): Promise<PortfolioFile> {
   const client = getRedis();
-  const stored = await client.get<PortfolioFile>(KV_KEY);
+  const key = userKey(userId);
+  const stored = await client.get<PortfolioFile>(key);
   if (stored && typeof stored === "object" && "holdings" in stored) {
+    // Sliding expiry: keep active users' portfolios alive.
+    await client.expire(key, KV_TTL_SECONDS);
     return normalise(stored);
   }
-  // First boot: seed Redis from the bundled portfolio.json so the dashboard
-  // is never empty on a fresh deploy.
+  // New user — seed from the bundled portfolio.json so they land on the demo.
   const seed = await readBundledSeed();
-  await client.set(KV_KEY, seed);
+  await client.set(key, seed, { ex: KV_TTL_SECONDS });
   return seed;
 }
 
-async function saveToRedis(p: PortfolioFile): Promise<void> {
+async function saveToRedis(userId: string, p: PortfolioFile): Promise<void> {
   const client = getRedis();
-  await client.set(KV_KEY, p);
+  await client.set(userKey(userId), p, { ex: KV_TTL_SECONDS });
 }
 
-export async function loadPortfolio(): Promise<PortfolioFile> {
-  return USE_REDIS ? loadFromRedis() : loadFromFile();
+export async function loadPortfolio(userId: string): Promise<PortfolioFile> {
+  return USE_REDIS ? loadFromRedis(userId) : loadFromFile(userId);
 }
 
-export async function savePortfolio(p: PortfolioFile): Promise<void> {
-  return USE_REDIS ? saveToRedis(p) : saveToFile(p);
+export async function savePortfolio(
+  userId: string,
+  p: PortfolioFile
+): Promise<void> {
+  return USE_REDIS ? saveToRedis(userId, p) : saveToFile(userId, p);
 }
 
 export function storageBackend(): "redis" | "file" {
