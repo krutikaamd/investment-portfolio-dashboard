@@ -72,25 +72,21 @@ export default function Page() {
       />
 
       <main className="max-w-[1440px] mx-auto px-4 sm:px-6 pt-6 pb-20 space-y-8">
+        <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-[12px] leading-relaxed text-ink-dim">
+          <span className="font-semibold text-warn">Disclaimer:</span> This
+          dashboard is for informational purposes only and does{" "}
+          <strong className="text-ink">not</strong> constitute financial,
+          investment, or trading advice. The authors (Krutika Dwivedi &amp;
+          Ciarán Daly) accept <strong className="text-ink">no liability</strong>{" "}
+          for any losses or gains arising from use of this tool. Always do your
+          own research and consult a qualified professional before investing.
+        </div>
+
         {error && (
           <div className="rounded-xl border border-neg/40 bg-neg/10 p-4 text-sm text-neg">
             {error}
           </div>
         )}
-
-        <div className="rounded-xl border border-accent/30 bg-accent/5 px-4 py-3 text-[12px] text-ink-dim flex items-center justify-between gap-3 flex-wrap">
-          <span>
-            <span className="font-semibold text-accent-glow">New:</span> Click
-            any{" "}
-            <span className="font-mono text-accent-glow">
-              Open ↗
-            </span>{" "}
-            button (or the coloured ticker symbol) in the tables below to view
-            the <strong className="text-ink">full DCF model</strong> for that
-            stock — year-by-year UFCF projections, EV→equity bridge, historical
-            financials, sensitivity grid, and per-ticker news.
-          </span>
-        </div>
 
         {data && <ConsensusAlertBanner data={data} onJump={setSelectedTicker} />}
 
@@ -205,54 +201,42 @@ function ConsensusAlertBanner({
   return (
     <div
       className={
-        "rounded-xl border p-4 " +
-        (isAlert
-          ? "border-neg/40 bg-neg/10"
-          : "border-warn/40 bg-warn/10")
+        "rounded-lg border px-3 py-2 flex items-center gap-2 flex-wrap text-[11px] " +
+        (isAlert ? "border-neg/40 bg-neg/10" : "border-warn/40 bg-warn/10")
       }
     >
-      <div className="flex items-start gap-3">
-        <span className="text-lg leading-none mt-0.5">⚠</span>
-        <div className="flex-1 space-y-2">
-          <div className="text-sm font-semibold">
-            {isAlert
-              ? `${alerts.length} holding${alerts.length === 1 ? "" : "s"} flagged ALERT — DCF materially disagrees with sell-side consensus`
-              : `${warns.length} holding${warns.length === 1 ? "" : "s"} flagged WARN — DCF moderately disagrees with consensus`}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {flagged
-              .sort((a, b) =>
-                Math.abs(b.dcf.consensusGap ?? 0) - Math.abs(a.dcf.consensusGap ?? 0)
-              )
-              .map((h) => (
-                <button
-                  key={h.dcf.ticker}
-                  onClick={() => onJump(h.dcf.ticker)}
-                  className={
-                    "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium hover:opacity-80 transition " +
-                    (h.dcf.consensusFlag === "ALERT"
-                      ? "bg-neg/20 text-neg"
-                      : "bg-warn/20 text-warn")
-                  }
-                  title={h.dcf.consensusDiagnosis ?? undefined}
-                >
-                  <span className="font-bold">{h.dcf.ticker}</span>
-                  <span className="num opacity-90">
-                    {h.dcf.consensusGap !== null
-                      ? `${h.dcf.consensusGap > 0 ? "+" : ""}${(h.dcf.consensusGap * 100).toFixed(0)}%`
-                      : ""}
-                  </span>
-                </button>
-              ))}
-          </div>
-          <p className="text-[11px] text-ink-dim leading-relaxed">
-            Click a ticker to see the diagnostic explanation. The DCF is shown
-            as-is — no post-hoc anchoring. WARN/ALERT means the model
-            meaningfully disagrees with the street; review the bull/bear range
-            and the diagnosis to decide which view you trust.
-          </p>
-        </div>
-      </div>
+      <span className="leading-none">⚠</span>
+      <span className="font-semibold text-ink-dim">
+        {isAlert
+          ? `${alerts.length} holding${alerts.length === 1 ? "" : "s"} ALERT — DCF materially disagrees with consensus`
+          : `${warns.length} holding${warns.length === 1 ? "" : "s"} WARN — DCF moderately disagrees with consensus`}
+      </span>
+      <span className="flex flex-wrap gap-1.5">
+        {flagged
+          .sort((a, b) =>
+            Math.abs(b.dcf.consensusGap ?? 0) - Math.abs(a.dcf.consensusGap ?? 0)
+          )
+          .map((h) => (
+            <button
+              key={h.dcf.ticker}
+              onClick={() => onJump(h.dcf.ticker)}
+              className={
+                "inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:opacity-80 transition " +
+                (h.dcf.consensusFlag === "ALERT"
+                  ? "bg-neg/20 text-neg"
+                  : "bg-warn/20 text-warn")
+              }
+              title={h.dcf.consensusDiagnosis ?? "Click to view diagnostic"}
+            >
+              <span className="font-bold">{h.dcf.ticker}</span>
+              <span className="num opacity-90">
+                {h.dcf.consensusGap !== null
+                  ? `${h.dcf.consensusGap > 0 ? "+" : ""}${(h.dcf.consensusGap * 100).toFixed(0)}%`
+                  : ""}
+              </span>
+            </button>
+          ))}
+      </span>
     </div>
   );
 }
