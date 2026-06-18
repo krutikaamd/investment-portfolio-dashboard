@@ -79,7 +79,8 @@ export function PrintReport({ p }: { p: PortfolioValuation | null }) {
         Margin of safety = (DCF fair value − price) / price. Fair values are
         computed live per company (WACC, terminal growth and FCF projections);
         nothing is hardcoded. Generated {today}. For informational use only —
-        not investment advice.
+        not investment advice. Built &amp; maintained by Krutika Dwivedi &amp;
+        Ciar&aacute;n Daly. © {new Date().getFullYear()} DCF Portfolio.
       </p>
     </div>
   );

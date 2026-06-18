@@ -168,6 +168,20 @@ export default function Page() {
         onClose={() => setEditorOpen(false)}
         onSaved={() => load(cash)}
       />
+
+      <footer className="border-t border-line/60 mt-4">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-ink-fade">
+          <span>
+            Built &amp; maintained by{" "}
+            <span className="font-semibold text-ink-dim">Krutika Dwivedi</span>{" "}
+            &amp;{" "}
+            <span className="font-semibold text-ink-dim">Ciarán Daly</span>
+          </span>
+          <span>
+            © {new Date().getFullYear()} · DCF Portfolio. All rights reserved.
+          </span>
+        </div>
+      </footer>
     </div>
     <PrintReport p={data?.portfolio ?? null} />
     </>
@@ -269,6 +283,9 @@ function Header({
             </h1>
             <p className="text-[11px] text-ink-fade">
               Live valuation · Yahoo Finance · Dynamic WACC
+            </p>
+            <p className="text-[11px] text-ink-dim font-medium mt-0.5">
+              by Krutika Dwivedi &amp; Ciarán Daly
             </p>
           </div>
         </div>
