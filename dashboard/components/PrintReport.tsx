@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtPct, fmtSignedPct, fmtUSD } from "@/lib/utils";
+import { AUTHORS } from "@/lib/site";
 import type { PortfolioValuation } from "@/lib/allocate";
 
 /**
@@ -79,8 +80,8 @@ export function PrintReport({ p }: { p: PortfolioValuation | null }) {
         Margin of safety = (DCF fair value − price) / price. Fair values are
         computed live per company (WACC, terminal growth and FCF projections);
         nothing is hardcoded. Generated {today}. For informational use only —
-        not investment advice. Built &amp; maintained by Krutika Dwivedi &amp;
-        Ciar&aacute;n Daly. © {new Date().getFullYear()} DCF Portfolio.
+        not investment advice. Built &amp; maintained by {AUTHORS}. ©{" "}
+        {new Date().getFullYear()} DCF Portfolio.
       </p>
     </div>
   );

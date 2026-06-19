@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { EarningsCalendar } from "@/components/EarningsCalendar";
 import { ExportMenu } from "@/components/ExportMenu";
 import { PrintReport } from "@/components/PrintReport";
+import { AUTHORS } from "@/lib/site";
 import type { PortfolioValuation, AllocationRecommendation } from "@/lib/allocate";
 
 interface ApiResp {
@@ -76,10 +77,10 @@ export default function Page() {
           <span className="font-semibold text-warn">Disclaimer:</span> This
           dashboard is for informational purposes only and does{" "}
           <strong className="text-ink">not</strong> constitute financial,
-          investment, or trading advice. The authors (Krutika Dwivedi &amp;
-          Ciarán Daly) accept <strong className="text-ink">no liability</strong>{" "}
-          for any losses or gains arising from use of this tool. Always do your
-          own research and consult a qualified professional before investing.
+          investment, or trading advice. The author(s) ({AUTHORS}) accept{" "}
+          <strong className="text-ink">no liability</strong> for any losses or
+          gains arising from use of this tool. Always do your own research and
+          consult a qualified professional before investing.
         </div>
 
         {error && (
@@ -169,9 +170,7 @@ export default function Page() {
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[12px] text-ink-fade">
           <span>
             Built &amp; maintained by{" "}
-            <span className="font-semibold text-ink-dim">Krutika Dwivedi</span>{" "}
-            &amp;{" "}
-            <span className="font-semibold text-ink-dim">Ciarán Daly</span>
+            <span className="font-semibold text-ink-dim">{AUTHORS}</span>
           </span>
           <span>
             © {new Date().getFullYear()} · DCF Portfolio. All rights reserved.
@@ -269,7 +268,7 @@ function Header({
               Live valuation · Yahoo Finance · Dynamic WACC
             </p>
             <p className="text-[11px] text-ink-dim font-medium mt-0.5">
-              by Krutika Dwivedi &amp; Ciarán Daly
+              by {AUTHORS}
             </p>
           </div>
         </div>
